@@ -129,6 +129,8 @@ class InterviewSchedule(models.Model):
     )
     STATUS_CHOICES = (
         ('Scheduled', 'Scheduled'),
+        ('Accepted', 'Accepted'),
+        ('Rejected', 'Rejected'),
         ('Completed', 'Completed'),
         ('Missed', 'Missed'),
     )

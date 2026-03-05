@@ -1,13 +1,22 @@
 import { useEffect, useState } from 'react';
-import { Star, User, ChevronDown, X } from 'lucide-react';
+import { Star, User, ChevronDown, X, Calendar, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 
 const STATUS_OPTIONS = ['PENDING', 'REVIEWED', 'SHORTLISTED', 'INTERVIEWING', 'REJECTED', 'ACCEPTED'];
 const STATUS_BADGE = { PENDING: 'badge-amber', REVIEWED: 'badge-indigo', SHORTLISTED: 'badge-emerald', REJECTED: 'badge-red', ACCEPTED: 'badge-emerald', INTERVIEWING: 'badge-violet' };
 
+const SCHEDULE_STATUS_CONFIG = {
+    Scheduled: { label: 'Awaiting Response', cls: 'bg-amber-500/20 text-amber-400 border border-amber-500/30', icon: Clock },
+    Accepted: { label: 'Candidate Accepted', cls: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30', icon: CheckCircle },
+    Rejected: { label: 'Candidate Declined', cls: 'bg-red-500/20 text-red-400 border border-red-500/30', icon: XCircle },
+    Completed: { label: 'Completed', cls: 'bg-slate-500/20 text-slate-400 border border-slate-500/30', icon: CheckCircle },
+    Missed: { label: 'Missed', cls: 'bg-red-500/20 text-red-400 border border-red-500/30', icon: XCircle },
+};
+
 export default function HRApplications() {
     const [apps, setApps] = useState([]);
+    const [schedules, setSchedules] = useState({});  // keyed by application id
     const [filter, setFilter] = useState('ALL');
     const [loading, setLoading] = useState(true);
 
@@ -21,7 +30,23 @@ export default function HRApplications() {
     });
 
     useEffect(() => {
-        api.get('/jobs/applications/').then(r => setApps(r.data)).catch(() => { }).finally(() => setLoading(false));
+        const fetchAll = async () => {
+            const [appsRes, schedulesRes] = await Promise.allSettled([
+                api.get('/jobs/applications/'),
+                api.get('/interviews/schedules/'),
+            ]);
+            if (appsRes.status === 'fulfilled') setApps(appsRes.value.data);
+            if (schedulesRes.status === 'fulfilled') {
+                // Map schedules by application id (latest one wins)
+                const map = {};
+                for (const s of schedulesRes.value.data) {
+                    map[s.application] = s;
+                }
+                setSchedules(map);
+            }
+            setLoading(false);
+        };
+        fetchAll();
     }, []);
 
     const updateStatus = async (id, status) => {
@@ -42,18 +67,16 @@ export default function HRApplications() {
                 scheduled_date: scheduleForm.scheduled_date,
                 scheduled_time: scheduleForm.scheduled_time,
             };
-            // Only include meeting_link if it has an actual value (URLField rejects empty strings)
-            if (scheduleForm.meeting_link) {
-                payload.meeting_link = scheduleForm.meeting_link;
-            }
-            await api.post('/interviews/schedules/', payload);
+            if (scheduleForm.meeting_link) payload.meeting_link = scheduleForm.meeting_link;
+            const res = await api.post('/interviews/schedules/', payload);
             await api.patch(`/jobs/applications/${scheduleModal.id}/`, { status: 'INTERVIEWING' });
             setApps(apps.map(a => a.id === scheduleModal.id ? { ...a, status: 'INTERVIEWING' } : a));
+            setSchedules(prev => ({ ...prev, [scheduleModal.id]: res.data }));
             setScheduleModal(null);
-            toast.success("Interview Scheduled and Candidate Notified!");
+            toast.success('Interview Scheduled and Candidate Notified!');
         } catch (err) {
             console.error(err);
-            toast.error("Failed to schedule interview.");
+            toast.error('Failed to schedule interview.');
         }
     };
 
@@ -80,50 +103,70 @@ export default function HRApplications() {
                 <div className="card text-center py-16 text-slate-500">No applications found.</div>
             ) : (
                 <div className="grid gap-4">
-                    {filtered.map(app => (
-                        <div key={app.id} className="card">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-sm">
-                                        <User size={18} />
+                    {filtered.map(app => {
+                        const schedule = schedules[app.id];
+                        const schedCfg = schedule ? SCHEDULE_STATUS_CONFIG[schedule.status] : null;
+                        const SchedIcon = schedCfg?.icon;
+                        return (
+                            <div key={app.id} className="card">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-sm">
+                                            <User size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-white">Applicant #{app.user || app.id}</p>
+                                            <p className="text-xs text-slate-400">Applied for Job #{app.job} · {new Date(app.created_at).toLocaleDateString()}</p>
+                                            {app.resume && app.resume_score != null && (
+                                                <span className="flex items-center gap-1 text-xs text-amber-400 mt-1">
+                                                    <Star size={11} />Resume Score: {app.resume_score}%
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="font-bold text-white">Applicant #{app.user || app.id}</p>
-                                        <p className="text-xs text-slate-400">Applied for Job #{app.job} · {new Date(app.created_at).toLocaleDateString()}</p>
-                                        {app.resume && (
-                                            <div className="flex items-center gap-3 mt-1">
-                                                {app.resume_score != null && (
-                                                    <span className="flex items-center gap-1 text-xs text-amber-400">
-                                                        <Star size={11} />Resume Score: {app.resume_score}%
-                                                    </span>
-                                                )}
-                                            </div>
+                                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                                        <span className={`badge ${STATUS_BADGE[app.status] || 'badge-slate'}`}>{app.status}</span>
+
+                                        {/* Schedule response badge */}
+                                        {schedCfg && (
+                                            <span className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${schedCfg.cls}`}>
+                                                <SchedIcon size={12} />
+                                                {schedCfg.label}
+                                            </span>
                                         )}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className={`badge ${STATUS_BADGE[app.status] || 'badge-slate'}`}>{app.status}</span>
 
-                                    {(app.status === 'SHORTLISTED' || app.status === 'PENDING') && (
-                                        <button
-                                            onClick={() => setScheduleModal(app)}
-                                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-sm"
-                                        >
-                                            Schedule AI Interview
-                                        </button>
-                                    )}
+                                        {/* show Schedule button if not yet scheduled, or Reschedule if rejected */}
+                                        {(!schedule || schedule.status === 'Rejected') && (app.status === 'SHORTLISTED' || app.status === 'PENDING' || app.status === 'INTERVIEWING') && (
+                                            <button
+                                                onClick={() => { setScheduleModal(app); setScheduleForm({ interview_type: 'AI', round_type: 'AI_SCREENING', scheduled_date: '', scheduled_time: '', meeting_link: '' }); }}
+                                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-sm flex items-center gap-1"
+                                            >
+                                                {schedule?.status === 'Rejected' ? <><RefreshCw size={11} />Reschedule</> : 'Schedule AI Interview'}
+                                            </button>
+                                        )}
 
-                                    <div className="relative">
-                                        <select value={app.status} onChange={e => updateStatus(app.id, e.target.value)}
-                                            className="appearance-none bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-1.5 pr-7 cursor-pointer focus:ring-1 focus:ring-indigo-500">
-                                            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                                        </select>
-                                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                        {/* Schedule date/time chip if scheduled */}
+                                        {schedule && (
+                                            <span className="flex items-center gap-1.5 text-xs text-slate-400">
+                                                <Calendar size={11} />
+                                                {new Date(schedule.scheduled_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                <Clock size={11} />
+                                                {schedule.scheduled_time}
+                                            </span>
+                                        )}
+
+                                        <div className="relative">
+                                            <select value={app.status} onChange={e => updateStatus(app.id, e.target.value)}
+                                                className="appearance-none bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-1.5 pr-7 cursor-pointer focus:ring-1 focus:ring-indigo-500">
+                                                {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 

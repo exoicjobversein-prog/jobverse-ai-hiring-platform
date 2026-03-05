@@ -17,13 +17,16 @@ The application follows a structured path for both recruiters and candidates:
 - **Asynchronous Task (Celery):** The resume is parsed and compared against the job description using Gemini AI.
 - **Result:** HR sees a "Resume Match Score" and a summary of strengths/weaknesses before even opening the file.
 
-### 3. Interview Scheduling (HR)
-- HR reviews the AI-screened candidates and clicks **Schedule AI Interview**.
-- An automated email is sent to the candidate with the scheduled time.
+### 3. Interview Scheduling & Candidate Response (HR & Student)
+- HR reviews screened candidates and clicks **Schedule AI Interview**.
+- **Candidate Notification:** The candidate receives an automated email and sees a pulsing "Interview Invitation" panel on their Student Dashboard.
+- **Confirmation:** The candidate can **Accept** or **Decline** the interview.
+- **Join Link:** Upon acceptance, a live **Countdown Timer** appears on the dashboard. Exactly at the scheduled time, a **"Join AI Interview"** button unlocks in real-time. Their response is reflected on the HR Applications page.
 
 ### 4. The AI Interview Session (Student)
-- **Real-time Interaction:** The candidate enters a dedicated interview interface. 
-- **Dynamic Questioning:** Instead of fixed questions, the AI generates technical challenges based on the job requirements and the candidate's specific resume.
+- **Real-time Interaction:** Upon acceptance and at the scheduled time, the candidate enters a dedicated interview interface. 
+- **Automated Context:** The system automatically uses the resume submitted during the application phase to ground the interview.
+- **Dynamic Questioning:** Instead of fixed questions, the AI generates technical challenges based on the job requirements and the candidate's specific profile.
 - **Live Proctoring:** The system monitors for suspicious activity (tab switching, copy-pasting) via WebSockets.
 
 ### 5. Automated Evaluation & Reporting
@@ -40,9 +43,10 @@ The application follows a structured path for both recruiters and candidates:
 
 *   **Role-Based Access:** Specialized dashboards for HR Professionals and Students.
 *   **Dynamic AI Interviews:** Context-aware questions that adapt to the candidate's profile.
+*   **Interview Management:** Candidate flow for accepting/rejecting interview appointments with real-time HR status updates.
 *   **WebSocket Proctoring:** Real-time anti-cheat monitoring with instant warnings.
 *   **Asynchronous Processing:** Celery handles heavy AI computations without slowing down the UI.
-*   **SMTP Integration:** Automated email notifications for scheduling and results.
+*   **SMTP Integration:** Automated email notifications for scheduling, responses, and results.
 
 ---
 

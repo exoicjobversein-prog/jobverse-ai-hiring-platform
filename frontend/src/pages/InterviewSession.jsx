@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { AlertCircle, Clock, Bot, Send, Square, Volume2, Mic } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -8,9 +8,8 @@ const MAX_QUESTIONS = 5; // Standard AI Interview length
 
 const InterviewSession = ({ user }) => {
     const { id: scheduleId } = useParams();
-    const [searchParams] = useSearchParams();
-    const resumeId = searchParams.get('resumeId');
     const navigate = useNavigate();
+
 
     const [interviewData, setInterviewData] = useState(null);
     const [currentQuestionText, setCurrentQuestionText] = useState('');
@@ -95,14 +94,14 @@ const InterviewSession = ({ user }) => {
 
             if (thisAttempts.length === 0) {
                 // Start a fresh one
-                const res = await api.post(`/interviews/schedules/${scheduleId}/start/`, { resumeId });
+                const res = await api.post(`/interviews/schedules/${scheduleId}/start/`, {});
                 setCurrentQuestionText(res.data.question);
                 speakText(res.data.question);
             } else {
                 // Not standard logic to resume an interrupted active question since "next_question" isn't stored in DB directly easily without last attempt
                 // For MVP, if there are attempts, we'll just ask them a generic continuation or fetch last attempt's next_question if we had it.
                 // We'll generate a new question
-                const res = await api.post(`/interviews/schedules/${scheduleId}/start/`, { resumeId });
+                const res = await api.post(`/interviews/schedules/${scheduleId}/start/`, {});
                 setCurrentQuestionText("Let's continue: " + res.data.question);
                 speakText("Let's continue. " + res.data.question);
                 setQuestionCount(thisAttempts.length + 1);

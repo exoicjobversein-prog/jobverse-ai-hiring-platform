@@ -18,12 +18,13 @@ class AttemptSerializer(serializers.ModelSerializer):
 class InterviewScheduleSerializer(serializers.ModelSerializer):
     candidate_name = serializers.CharField(source='candidate.username', read_only=True)
     job_title = serializers.CharField(source='application.job.title', read_only=True)
+    company_name = serializers.CharField(source='application.job.company', read_only=True, default='')
     meeting_link = serializers.URLField(allow_blank=True, allow_null=True, required=False)
 
     class Meta:
         model = InterviewSchedule
         fields = '__all__'
-        read_only_fields = ['candidate', 'status', 'final_score', 'strengths', 'weaknesses', 'recommendation']
+        read_only_fields = ['candidate', 'final_score', 'strengths', 'weaknesses', 'recommendation']
 
 
 class InterviewAttemptSerializer(serializers.ModelSerializer):

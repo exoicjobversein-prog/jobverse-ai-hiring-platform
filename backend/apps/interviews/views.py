@@ -39,6 +39,8 @@ Date: {schedule.scheduled_date}
 Time: {schedule.scheduled_time}
 Link: {schedule.meeting_link or 'Check Student Dashboard for AI Interview Info'}
 
+Please log in to your JobVerse Student Dashboard to Accept or Reject this interview invitation.
+
 Good luck!
 JobVerse Team"""
         try:
@@ -46,28 +48,61 @@ JobVerse Team"""
         except Exception as e:
             print(f"Scheduling Email Error: {e}")
 
+    @action(detail=True, methods=['post'], url_path='respond')
+    def respond(self, request, pk=None):
+        """Candidate accepts or rejects a scheduled interview."""
+        schedule = self.get_object()
+        # Ensure only the candidate can respond
+        if request.user != schedule.candidate:
+            return Response({'detail': 'Not authorised.'}, status=403)
+
+        response_val = request.data.get('response')
+        if response_val not in ('Accepted', 'Rejected'):
+            return Response({'detail': 'Invalid response. Must be Accepted or Rejected.'}, status=400)
+
+        schedule.status = response_val
+        schedule.save()
+
+        # Notify HR via email
+        from django.core.mail import send_mail
+        from django.conf import settings
+        try:
+            hr_email = schedule.application.job.created_by.email
+            subject = f"Interview {response_val} - {schedule.candidate.get_full_name() or schedule.candidate.username}"
+            body = (
+                f"Hello,\n\nThe candidate {schedule.candidate.get_full_name() or schedule.candidate.username} "
+                f"has {response_val.lower()} the interview for the position of {schedule.application.job.title}.\n\n"
+                f"Scheduled Date: {schedule.scheduled_date} at {schedule.scheduled_time}\n\n"
+                f"Please log in to the HR Dashboard to view the update.\n\nJobVerse Team"
+            )
+            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [hr_email], fail_silently=False)
+        except Exception as e:
+            print(f"HR notification email error: {e}")
+
+        serializer = self.get_serializer(schedule)
+        return Response(serializer.data)
+
+
+
     @action(detail=True, methods=['post'], url_path='start')
     def start_interview(self, request, pk=None):
         schedule = self.get_object()
-        resume_id = request.data.get('resumeId')
-        
-        if not resume_id:
-             return Response({'detail': 'resumeId required'}, status=400)
-             
+
+        # Auto-resolve resume from the linked job application (no frontend resumeId needed)
+        resume_text = "Candidate Resume Content"  # fallback
         try:
-            r = Resume.objects.get(id=resume_id)
-            resume_text = r.summary if r.summary else "Candidate Resume Content"
+            app_resume = schedule.application.resume
+            if app_resume:
+                resume_text = app_resume.summary if app_resume.summary else resume_text
         except Exception as e:
             print(f"Resume extraction error: {e}")
-            pass
-            
-        schedule.status = 'IN_PROGRESS'
-        schedule.save()
-        
-        # Generate Question
+
+        # Generate first question
         from services.ai_service import generate_interview_question
         job_reqs = schedule.application.job.requirements
         first_q = generate_interview_question(resume_text, job_reqs, [])
+        return Response({'question': first_q})
+
         return Response({'question': first_q})
 
     @action(detail=True, methods=['post'], url_path='submit-answer')
