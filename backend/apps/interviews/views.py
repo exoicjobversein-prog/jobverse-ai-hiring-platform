@@ -1,0 +1,245 @@
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
+from .models import Interview, Attempt, Question, PracticeInterview, PracticeAttempt, AptitudeQuestion, AptitudeTestResult, InterviewSchedule, InterviewAttempt
+from .serializers import (InterviewSerializer, AttemptSerializer, QuestionSerializer,
+                          PracticeInterviewSerializer, PracticeAttemptSerializer,
+                          AptitudeQuestionSerializer, AptitudeTestResultSerializer,
+                          InterviewScheduleSerializer, InterviewAttemptSerializer)
+from apps.jobs.models import Application
+from .tasks import generate_initial_question, process_interview_answer, process_practice_answer
+
+
+class InterviewScheduleViewSet(viewsets.ModelViewSet):
+    serializer_class = InterviewScheduleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role in ('HR', 'ADMIN'):
+            return InterviewSchedule.objects.all()
+        return InterviewSchedule.objects.filter(candidate=user)
+        
+    def perform_create(self, serializer):
+        from django.core.mail import send_mail
+        from django.conf import settings
+        application_id = self.request.data.get('application')
+        application = get_object_or_404(Application, id=application_id)
+        schedule = serializer.save(candidate=application.user)
+        
+        # Send Email
+        subject = 'Your AI Interview Has Been Scheduled - JobVerse'
+        body = f"""Hello {application.user.first_name},
+
+Your AI interview for {application.job.title} has been scheduled.
+Date: {schedule.scheduled_date}
+Time: {schedule.scheduled_time}
+Link: {schedule.meeting_link or 'Check Student Dashboard for AI Interview Info'}
+
+Good luck!
+JobVerse Team"""
+        try:
+            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [application.user.email], fail_silently=False)
+        except Exception as e:
+            print(f"Scheduling Email Error: {e}")
+
+    @action(detail=True, methods=['post'], url_path='start')
+    def start_interview(self, request, pk=None):
+        schedule = self.get_object()
+        resume_id = request.data.get('resumeId')
+        
+        if not resume_id:
+             return Response({'detail': 'resumeId required'}, status=400)
+             
+        try:
+            r = Resume.objects.get(id=resume_id)
+            resume_text = r.summary if r.summary else "Candidate Resume Content"
+        except Exception as e:
+            print(f"Resume extraction error: {e}")
+            pass
+            
+        schedule.status = 'IN_PROGRESS'
+        schedule.save()
+        
+        # Generate Question
+        from services.ai_service import generate_interview_question
+        job_reqs = schedule.application.job.requirements
+        first_q = generate_interview_question(resume_text, job_reqs, [])
+        return Response({'question': first_q})
+
+    @action(detail=True, methods=['post'], url_path='submit-answer')
+    def submit_answer(self, request, pk=None):
+        schedule = self.get_object()
+        question = request.data.get('question')
+        answer = request.data.get('answer')
+        
+        from services.ai_service import evaluate_interview_answer
+        job_reqs = schedule.application.job.requirements
+        resume_text = "Candidate Context" 
+        
+        # Evaluate
+        eval_result = evaluate_interview_answer(question, answer, resume_text, job_reqs)
+        
+        # Save attempt
+        InterviewAttempt.objects.create(
+            interview=schedule,
+            question=question,
+            answer=answer,
+            score=eval_result.get('score', 0),
+            feedback=eval_result.get('feedback', '')
+        )
+        
+        return Response({
+            'score': eval_result.get('score'),
+            'feedback': eval_result.get('feedback'),
+            'next_question': eval_result.get('next_question')
+        })
+
+    @action(detail=True, methods=['post'], url_path='end')
+    def end_interview(self, request, pk=None):
+        schedule = self.get_object()
+        attempts = schedule.attempt_records.all()
+        
+        if attempts.exists():
+            avg = sum([a.score for a in attempts if a.score]) / attempts.count()
+            schedule.final_score = avg * 10  # Convert 1-10 to 0-100 score
+        else:
+            schedule.final_score = 0
+            
+        attempts_data = [{"question": a.question, "answer": a.answer, "score": a.score, "feedback": a.feedback} for a in attempts]
+        
+        from services.ai_service import generate_final_report
+        job_reqs = schedule.application.job.requirements
+        report = generate_final_report(job_reqs, attempts_data)
+            
+        schedule.status = 'COMPLETED'
+        schedule.strengths = report.get('strengths', "Good technical understanding shown in evaluated answers.")
+        schedule.weaknesses = report.get('weaknesses', "Could provide more real-world examples in responses.")
+        schedule.recommendation = report.get('recommendation', "Proceed to next round" if schedule.final_score > 65 else "Reject")
+        schedule.save()
+        
+        # Send Email to HR
+        from django.core.mail import send_mail
+        from django.conf import settings
+        hr_email = schedule.application.job.created_by.email
+        subject = f"AI Interview Completed - {schedule.candidate_name}"
+        body = f"Hello,\n\nThe AI Interview for candidate {schedule.candidate_name} ({schedule.application.job.title}) has been completed.\nFinal Score: {schedule.final_score}%\n\nStrengths:\n{schedule.strengths}\n\nWeaknesses:\n{schedule.weaknesses}\n\nRecommendation:\n{schedule.recommendation}\n\nPlease check the HR dashboard for the full report."
+        try:
+            send_mail(subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'exoic.jobverse.in@gmail.com'), [hr_email], fail_silently=False)
+        except Exception as e:
+            print(f"Error sending HR email: {e}")
+            pass
+        
+        return Response({'detail': 'Interview completed successfully', 'score': schedule.final_score})
+
+
+class InterviewAttemptViewSet(viewsets.ModelViewSet):
+    serializer_class = InterviewAttemptSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return InterviewAttempt.objects.filter(interview__candidate=self.request.user)
+
+class InterviewViewSet(viewsets.ModelViewSet):
+    serializer_class = InterviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role in ('HR', 'ADMIN'):
+            return Interview.objects.all()
+        return Interview.objects.filter(application__user=user)
+
+    @action(detail=True, methods=['post'], url_path='start')
+    def start_interview(self, request, pk=None):
+        interview = self.get_object()
+        if interview.status != 'SCHEDULED':
+            return Response({'detail': 'Interview is already started or completed.'}, status=status.HTTP_400_BAD_REQUEST)
+        interview.status = 'IN_PROGRESS'
+        interview.started_at = timezone.now()
+        interview.save()
+        generate_initial_question.delay(interview.id)
+        return Response({'detail': 'JobVerse AI Interview Engine is initializing your session. First question is being generated.'})
+
+
+class AttemptViewSet(viewsets.ModelViewSet):
+    serializer_class = AttemptSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Attempt.objects.filter(interview__application__user=self.request.user)
+
+    def perform_create(self, serializer):
+        attempt = serializer.save()
+        process_interview_answer.delay(attempt.id)
+
+
+# ─── PRACTICE INTERVIEWS ─────────────────────────────────────────────────────
+
+class PracticeInterviewViewSet(viewsets.ModelViewSet):
+    serializer_class = PracticeInterviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return PracticeInterview.objects.filter(user=self.request.user).order_by('-started_at')
+
+    def perform_create(self, serializer):
+        session = serializer.save(user=self.request.user)
+        # Trigger Celery task to generate first question
+        process_practice_answer.delay(session.id, '', is_first=True)
+
+    @action(detail=True, methods=['post'], url_path='submit-answer')
+    def submit_answer(self, request, pk=None):
+        session = self.get_object()
+        answer = request.data.get('answer', '')
+        order = session.attempts.count() + 1
+
+        attempt = PracticeAttempt.objects.create(
+            practice=session,
+            question_text=request.data.get('question_text', ''),
+            answer=answer,
+            order=order
+        )
+        # fire async evaluation + next question
+        process_practice_answer.delay(session.id, answer, is_first=False)
+        return Response({'detail': 'JobVerse AI Interview Engine is evaluating your answer and generating the next technical challenge.', 'attempt_id': attempt.id})
+
+    @action(detail=True, methods=['post'], url_path='end')
+    def end_session(self, request, pk=None):
+        session = self.get_object()
+        session.is_completed = True
+        session.completed_at = timezone.now()
+        session.save()
+        return Response({'detail': 'Practice session completed!'})
+
+
+# ─── APTITUDE TESTS ────────────────────────────────────────────────────────────
+
+class AptitudeQuestionViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AptitudeQuestionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = AptitudeQuestion.objects.all()
+        category = self.request.query_params.get('category')
+        difficulty = self.request.query_params.get('difficulty')
+        if category:
+            qs = qs.filter(category=category)
+        if difficulty:
+            qs = qs.filter(difficulty=difficulty)
+        return qs.order_by('?')[:20]  # Randomize and limit
+
+
+class AptitudeTestResultViewSet(viewsets.ModelViewSet):
+    serializer_class = AptitudeTestResultSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'post']
+
+    def get_queryset(self):
+        return AptitudeTestResult.objects.filter(user=self.request.user).order_by('-completed_at')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
