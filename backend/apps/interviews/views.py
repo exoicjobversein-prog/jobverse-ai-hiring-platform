@@ -267,6 +267,21 @@ class AptitudeQuestionViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(difficulty=difficulty)
         return qs.order_by('?')[:20]  # Randomize and limit
 
+    @action(detail=False, methods=['get'])
+    def full_test(self, request):
+        """Returns 20 random questions from each of the 4 domains (80 total) randomized."""
+        import random
+        categories = ['APTITUDE', 'LOGICAL', 'COMMUNICATION', 'DOMAIN']
+        all_questions = []
+        for cat in categories:
+            # Get up to 20 random questions for this category
+            cat_qs = AptitudeQuestion.objects.filter(category=cat).order_by('?')[:20]
+            all_questions.extend(list(cat_qs))
+            
+        random.shuffle(all_questions)
+        serializer = self.get_serializer(all_questions, many=True)
+        return Response(serializer.data)
+
 
 class AptitudeTestResultViewSet(viewsets.ModelViewSet):
     serializer_class = AptitudeTestResultSerializer
@@ -277,4 +292,74 @@ class AptitudeTestResultViewSet(viewsets.ModelViewSet):
         return AptitudeTestResult.objects.filter(user=self.request.user).order_by('-completed_at')
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        # We handle creation manually in evaluate_test action
+        pass
+
+    @action(detail=False, methods=['post'])
+    def evaluate_test(self, request):
+        """
+        Expects payload: 
+        {
+          "category": "FULL_TEST",
+          "answers": [ {"question_id": 1, "selected": "A"}, ... ],
+          "time_taken_seconds": 1200
+        }
+        """
+        category = request.data.get('category', 'FULL_TEST')
+        time_taken = request.data.get('time_taken_seconds', 0)
+        answers_data = request.data.get('answers', [])
+        
+        domain_scores = {'APTITUDE': 0, 'LOGICAL': 0, 'COMMUNICATION': 0, 'DOMAIN': 0}
+        domain_totals = {'APTITUDE': 0, 'LOGICAL': 0, 'COMMUNICATION': 0, 'DOMAIN': 0}
+        total_score = 0
+        detailed_responses = []
+
+        # Fetch all questions in one go for efficiency
+        q_ids = [ans.get('question_id') for ans in answers_data]
+        questions = AptitudeQuestion.objects.filter(id__in=q_ids)
+        q_map = {q.id: q for q in questions}
+
+        for ans in answers_data:
+            q_id = ans.get('question_id')
+            selected = ans.get('selected')
+            q = q_map.get(q_id)
+            if not q:
+                continue
+                
+            is_correct = (selected == q.correct_option)
+            if is_correct:
+                total_score += 1
+                domain_scores[q.category] = domain_scores.get(q.category, 0) + 1
+            
+            domain_totals[q.category] = domain_totals.get(q.category, 0) + 1
+            
+            detailed_responses.append({
+                "question_id": q.id,
+                "question_text": q.question_text,
+                "category": q.category,
+                "selected": selected,
+                "correct": q.correct_option,
+                "is_correct": is_correct,
+                "explanation": q.explanation,
+                "option_a": q.option_a,
+                "option_b": q.option_b,
+                "option_c": q.option_c,
+                "option_d": q.option_d,
+            })
+        
+        # Format domain scores as nice readouts
+        formatted_domain_scores = {
+            k: {"score": v, "total": domain_totals[k]} for k, v in domain_scores.items() if domain_totals[k] > 0
+        }
+
+        result = AptitudeTestResult.objects.create(
+            user=request.user,
+            category=category,
+            score=total_score,
+            total_questions=len(answers_data),
+            time_taken_seconds=time_taken,
+            domain_scores=formatted_domain_scores,
+            detailed_responses=detailed_responses
+        )
+        
+        return Response(self.get_serializer(result).data, status=status.HTTP_201_CREATED)

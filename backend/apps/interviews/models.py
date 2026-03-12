@@ -80,9 +80,10 @@ class PracticeAttempt(models.Model):
 
 class AptitudeQuestion(models.Model):
     CATEGORY_CHOICES = [
+        ('APTITUDE', 'Aptitude'),
         ('LOGICAL', 'Logical Reasoning'),
-        ('QUANTITATIVE', 'Quantitative Aptitude'),
-        ('DATA', 'Data Interpretation'),
+        ('COMMUNICATION', 'Communication Skills'),
+        ('DOMAIN', 'Domain-Based'),
     ]
     DIFFICULTY_CHOICES = [
         ('EASY', 'Easy'),
@@ -105,14 +106,22 @@ class AptitudeQuestion(models.Model):
 
 class AptitudeTestResult(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='aptitude_results')
-    category = models.CharField(max_length=20, default='LOGICAL')
+    # Use category for a specific domain test, or 'FULL_TEST' for the 80-question assessment
+    category = models.CharField(max_length=20, default='FULL_TEST')
     score = models.IntegerField(default=0)
     total_questions = models.IntegerField(default=0)
     time_taken_seconds = models.IntegerField(default=0)
+    
+    # Store dynamic breakdowns for the full test (e.g., {"APTITUDE": 15, "LOGICAL": 18, ...})
+    domain_scores = models.JSONField(default=dict, blank=True)
+    
+    # Store detailed Q&A responses for review: [{"question_id": 1, "selected": "A", "correct": "C", ...}]
+    detailed_responses = models.JSONField(default=list, blank=True)
+    
     completed_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.category}: {self.score}/{self.total_questions}"
+        return f"{self.user.username} - {self.category} Test: {self.score}/{self.total_questions}"
 
 
 # ─── NEW AI INTERVIEW SYSTEM MODELS (V2) ────────────────────────────────────

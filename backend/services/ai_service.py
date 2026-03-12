@@ -1,49 +1,95 @@
 import os
+import re
 import json
 import google.generativeai as genai
 from django.conf import settings
 
 # Initialize Gemini
 genai.configure(api_key=settings.GEMINI_API_KEY)
-# Using gemini-1.5-flash which is standard for text generation tasks
-model = genai.GenerativeModel('gemini-1.5-flash')
+# Using gemini-flash-latest since 1.5 is unavailable and 2.0 has quota limits
+model = genai.GenerativeModel('gemini-flash-latest')
 
-def evaluate_resume(resume_text, job_requirements):
+def evaluate_resume_base(resume_text, initial_ats_score):
     """
-    Evaluates a resume against job requirements.
-    Returns structured JSON with technical_score, skills, and summary.
+    Evaluates a resume's overall quality using Gemini to provide a final ATS score, extracted skills, and suggestions.
     """
     prompt = f"""
-    You are an expert technical recruiter matching a resume to a job description.
-    Job Requirements:
-    {job_requirements}
-
-    Resume:
+    You are an expert AI Resume ATS Analyzer.
+    A rule-based system gave this resume an initial score of {initial_ats_score} / 100 based on word count, sections, action verbs, and metrics.
+    
+    Resume Text:
     {resume_text}
 
-    Evaluate the candidate out of 100 based strictly on the job requirements.
-    Return ONLY a valid JSON object with the following keys, no markdown formatting:
+    Tasks:
+    1. Adjust the ATS score out of 100 based on the actual quality of the content (impact, clarity, relevance).
+    2. Extract a list of skills (technical, soft, tools) found in the resume.
+    3. List the candidate's strengths.
+    4. List areas of weakness or missing sections.
+    5. Provide actionable suggestions to improve the resume for ATS systems.
+
+    Return ONLY a valid JSON object with the following keys, no markdown formatting (e.g., do not use ```json...):
     {{
-        "technical_score": integer between 0-100,
-        "skills": list of strings (matched skills),
-        "summary": "String explaining the candidate's suitability"
+        "final_ats_score": integer between 0-100,
+        "skills": ["skill1", "skill2"],
+        "strengths": ["strength1", "strength2"],
+        "weaknesses": ["weakness1", "weakness2"],
+        "suggestions": ["suggestion1"]
     }}
     """
     
     try:
         response = model.generate_content(prompt)
         result_text = response.text.strip()
-        if result_text.startswith('```json'):
-            result_text = result_text[7:]
-        if result_text.endswith('```'):
-            result_text = result_text[:-3]
-            
+        # More robust JSON extraction
+        match = re.search(r'\{.*\}', result_text, re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
         return json.loads(result_text)
     except Exception as e:
+        print(f"AI Base Evaluation Error: {e}")
         return {
-            "technical_score": 0,
+            "final_ats_score": initial_ats_score,
             "skills": [],
-            "summary": f"Failed to parse AI response: {str(e)}"
+            "strengths": ["Unable to generate via AI at this moment."],
+            "weaknesses": ["Unable to generate via AI at this moment."],
+            "suggestions": ["Ensure file formatting is clean and try again."]
+        }
+
+def evaluate_resume_for_job(resume_text, job_description, heuristic_score):
+    """
+    Evaluates how well a resume matches a specific Job Description.
+    """
+    prompt = f"""
+    You are an expert technical recruiter matching a resume to a job description.
+    Job Requirements:
+    {job_description}
+
+    Resume:
+    {resume_text}
+
+    Tasks:
+    1. Evaluate the match between the resume and the job requirements. A heuristic match was {heuristic_score}%. Provide an accurate match score (0-100).
+    2. Identify specific required keywords/skills from the job description that are MISSING in the resume.
+
+    Return ONLY a valid JSON object with the following keys, no markdown formatting:
+    {{
+        "job_match_score": integer between 0-100,
+        "missing_skills": ["missing1", "missing2"]
+    }}
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        result_text = response.text.strip()
+        match = re.search(r'\{.*\}', result_text, re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
+        return json.loads(result_text)
+    except Exception as e:
+        print(f"AI JD Matching Error: {e}")
+        return {
+            "job_match_score": heuristic_score,
+            "missing_skills": ["AI processing failed to detect missing skills"]
         }
 
 

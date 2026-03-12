@@ -18,8 +18,18 @@ export default function StudentProfile({ user, setUser }) {
         try {
             const formData = new FormData();
             Object.entries(profile).forEach(([k, v]) => {
-                if (k === 'skills') formData.append(k, JSON.stringify(v));
-                else if (v !== null && v !== undefined) formData.append(k, v);
+                if (v === null || v === undefined || v === '') return;
+
+                if (k === 'skills') {
+                    formData.append(k, JSON.stringify(v));
+                } else if (k === 'profile_photo') {
+                    // Only append profile photo if it's an actual File object, not a string URL
+                    if (v instanceof File) {
+                        formData.append(k, v);
+                    }
+                } else if (typeof v === 'string' || typeof v === 'number') {
+                    formData.append(k, v);
+                }
             });
             const { data } = await api.patch('/users/profile/', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
