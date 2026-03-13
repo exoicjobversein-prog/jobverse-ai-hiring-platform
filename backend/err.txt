@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "C:\Gautam\Projects\JobVerse\backend\test_import.py", line 10, in <module>
+    from apps.interviews.urls import *
+  File "C:\Gautam\Projects\JobVerse\backend\apps\interviews\urls.py", line 3, in <module>
+    from .views import (InterviewViewSet, AttemptViewSet,
+ImportError: cannot import name 'ProctoringViolationViewSet' from 'apps.interviews.views' (C:\Gautam\Projects\JobVerse\backend\apps\interviews\views.py)

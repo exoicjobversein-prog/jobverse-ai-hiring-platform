@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Brain, Clock, CheckCircle, XCircle, ChevronRight, Activity, TrendingUp, Edit3, Target } from 'lucide-react';
+import { Brain, Clock, CheckCircle, XCircle, ChevronRight, Activity, TrendingUp, Edit3, Target, ShieldAlert, MonitorOff, Files, CameraOff, Video, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
+import ProctoringMonitor from '../../components/proctoring/ProctoringMonitor';
 
 const TIMER_SECONDS = 40 * 60; // 40 minutes for the full test
 
@@ -25,9 +26,11 @@ export default function AptitudePractice() {
     const [results, setResults] = useState(null);
     const [warnings, setWarnings] = useState(0);
     const [tabSwitches, setTabSwitches] = useState(0);
+    const [screenshotWarnings, setScreenshotWarnings] = useState(0);
     const [showSubmitDialog, setShowSubmitDialog] = useState(false);
     const [showEscWarningDialog, setShowEscWarningDialog] = useState(false);
     const [showTabWarningDialog, setShowTabWarningDialog] = useState(false);
+    const [showScreenshotWarningDialog, setShowScreenshotWarningDialog] = useState(false);
     const [visited, setVisited] = useState(new Set()); // indices of visited questions
     const [currentSelection, setCurrentSelection] = useState(null); // selected option for current question
     const timerRef = useRef(null);
@@ -35,7 +38,13 @@ export default function AptitudePractice() {
     const visibilityListenerRef = useRef(null);
     const warningsRef = useRef(0); // Keep a ref in sync for use inside event listeners
     const tabSwitchesRef = useRef(0);
+    const screenshotWarningsRef = useRef(0);
     const intentionalExitRef = useRef(false); // Track when we intentionally exit fullscreen (submit)
+    
+    // Comprehensive Proctoring Logs
+    const [proctoringLogs, setProctoringLogs] = useState([]);
+    const proctoringLogsRef = useRef([]);
+    const [severeViolationMsg, setSevereViolationMsg] = useState(null);
 
     useEffect(() => {
         return () => {
@@ -59,20 +68,18 @@ export default function AptitudePractice() {
         tabSwitchesRef.current = tabSwitches;
     }, [tabSwitches]);
 
+    useEffect(() => {
+        screenshotWarningsRef.current = screenshotWarnings;
+    }, [screenshotWarnings]);
 
+    const totalViolations = warnings + tabSwitches + screenshotWarnings;
+    const totalViolationsRef = () => warningsRef.current + tabSwitchesRef.current + screenshotWarningsRef.current;
 
-    const startTest = async () => {
+    const [isRequestingPermissions, setIsRequestingPermissions] = useState(false);
+
+    const prepareTest = async () => {
+        setStatus('LOADING');
         try {
-            // Browsers strictly require requestFullscreen to be called IMMEDIATELY after a user gesture (like a click).
-            // We must call it before any await/fetch calls that could delay it past the browser's 1-second grace period.
-            try {
-                if (document.documentElement.requestFullscreen) {
-                    await document.documentElement.requestFullscreen();
-                }
-            } catch (err) {
-                console.log("Fullscreen request failed:", err);
-            }
-
             const endpoint = selectedCategory === 'FULL_TEST'
                 ? '/interviews/aptitude/questions/full_test/'
                 : `/interviews/aptitude/questions/?category=${selectedCategory}`;
@@ -80,10 +87,7 @@ export default function AptitudePractice() {
             const res = await api.get(endpoint);
             if (res.data.length === 0) {
                 toast.error("No questions found in database.");
-                // Ensure we exit fullscreen if we fail to start
-                if (document.fullscreenElement) {
-                   document.exitFullscreen().catch(e => console.log(e));
-                }
+                setStatus('LANDING');
                 return;
             }
 
@@ -94,25 +98,128 @@ export default function AptitudePractice() {
             setAnswers([]);
             setTimer(testTime);
 
+            // Fetch simulated loading delay
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            setStatus('PRE_TEST_INSTRUCTIONS');
+        } catch (error) {
+            toast.error("Failed to load test session.");
+            setStatus('LANDING');
+        }
+    };
+
+    const startActualTest = async () => {
+        setIsRequestingPermissions(true);
+        try {
+            // Request camera and microphone access
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                // Stop tracks immediately since the ProctoringMonitor will request its own
+                stream.getTracks().forEach(track => track.stop());
+            } catch (err) {
+                toast.error("Camera and Microphone permissions are strictly required to start the test.");
+                setIsRequestingPermissions(false);
+                return;
+            }
+            
+            // Now request fullscreen on the button click gesture
+            try {
+                if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                }
+            } catch (err) {
+                console.log("Fullscreen request failed:", err);
+            }
+
             // Reset all violation counters — both state AND refs
             setWarnings(0);
             warningsRef.current = 0;
             setTabSwitches(0);
             tabSwitchesRef.current = 0;
+            setScreenshotWarnings(0);
+            screenshotWarningsRef.current = 0;
             intentionalExitRef.current = false;
+            setProctoringLogs([]);
+            proctoringLogsRef.current = [];
+            setSevereViolationMsg(null);
 
             setVisited(new Set([0]));
 
-            // Register proctoring listeners IMMEDIATELY (before the loading delay)
-            // so violations during the loading screen are tracked too.
-
-            // Remove any previous listeners to avoid duplicates on re-start
+            // Register proctoring listeners
             if (fullscreenListenerRef.current) {
                 document.removeEventListener('fullscreenchange', fullscreenListenerRef.current);
             }
             if (visibilityListenerRef.current) {
                 document.removeEventListener('visibilitychange', visibilityListenerRef.current);
             }
+            if (window._cleanupKeyDown) {
+                document.removeEventListener('keydown', window._cleanupKeyDown);
+                window._cleanupKeyDown = null;
+            }
+            if (window._cleanupKeyUp) {
+                document.removeEventListener('keyup', window._cleanupKeyUp);
+                window._cleanupKeyUp = null;
+            }
+            if (window._cleanupBlur) {
+                window.removeEventListener('blur', window._cleanupBlur);
+                window._cleanupBlur = null;
+            }
+
+
+
+            const triggerScreenshotWarning = () => {
+                if (intentionalExitRef.current) return;
+                const newWarnings = screenshotWarningsRef.current + 1;
+                screenshotWarningsRef.current = newWarnings;
+                setScreenshotWarnings(newWarnings);
+                addProctoringLog('screenshot_attempt', 'Attempted to take a screenshot.', 'warning');
+                setShowScreenshotWarningDialog(true);
+            };
+
+            const handleKeyDown = (e) => {
+                const isMacScreenshot = e.metaKey && e.shiftKey && ['3', '4', '5'].includes(e.key);
+                const isPrint = (e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P');
+                const isWindowsSnippet = e.metaKey && e.shiftKey && (e.key === 's' || e.key === 'S');
+
+                if (isMacScreenshot || isPrint || isWindowsSnippet) {
+                    e.preventDefault();
+                    triggerScreenshotWarning();
+                }
+            };
+            
+            const handleKeyUp = (e) => {
+                if (e.key === 'PrintScreen') {
+                    e.preventDefault();
+                    triggerScreenshotWarning();
+                }
+                
+                if (e.key === 's' || e.key === 'S' || e.key === 'Meta' || e.key === 'Shift') {
+                    if ((e.metaKey && e.shiftKey) || (e.key === 's' && e.metaKey && e.shiftKey)) {
+                         triggerScreenshotWarning();
+                    }
+                }
+            };
+
+            const handleBlur = () => {
+                // Windows Snipping tool suspends process execution and blurs the window.
+                // If it happens and we aren't intentionally exiting or switching tabs, it's likely snippet.
+                if (status === 'PLAYING' && document.fullscreenElement) {
+                     // Check if it's the snippet overlay by observing lack of tab switch
+                     setTimeout(() => {
+                         if (!document.hidden && document.activeElement === document.body) {
+                            triggerScreenshotWarning();
+                         }
+                     }, 150);
+                }
+            };
+
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+            window.addEventListener('blur', handleBlur);
+            
+            window._cleanupKeyDown = handleKeyDown;
+            window._cleanupKeyUp = handleKeyUp;
+            window._cleanupBlur = handleBlur;
 
             // Detect when fullscreen is exited (ESC key, F11, or any other means)
             const handleFullscreenChange = () => {
@@ -124,6 +231,7 @@ export default function AptitudePractice() {
                     const newWarnings = warningsRef.current + 1;
                     warningsRef.current = newWarnings;
                     setWarnings(newWarnings);
+                    addProctoringLog('fullscreen_exit', 'Exited fullscreen mode.', 'warning');
                     setShowEscWarningDialog(true);
                 }
             };
@@ -136,15 +244,13 @@ export default function AptitudePractice() {
                     const newSwitches = tabSwitchesRef.current + 1;
                     tabSwitchesRef.current = newSwitches;
                     setTabSwitches(newSwitches);
+                    addProctoringLog('tab_switch', 'Switched to a different tab or application.', 'warning');
                     setShowTabWarningDialog(true);
                 }
             };
             document.addEventListener('visibilitychange', handleVisibilityChange);
             visibilityListenerRef.current = handleVisibilityChange;
 
-            // Show loading screen for at least 4 seconds
-            setStatus('LOADING');
-            await new Promise(resolve => setTimeout(resolve, 4000));
             setStatus('PLAYING');
 
             document.body.classList.add('hide-dashboard-sidebar');
@@ -152,6 +258,7 @@ export default function AptitudePractice() {
             clearInterval(timerRef.current);
             timerRef.current = setInterval(() => {
                 setTimer(t => {
+                    const testTime = selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60;
                     if (t <= 1) {
                         clearInterval(timerRef.current);
                         submitTest(answers, 0, testTime);
@@ -161,11 +268,13 @@ export default function AptitudePractice() {
                 });
             }, 1000);
         } catch (error) {
-            toast.error("Failed to load test session.");
+            toast.error("Failed to initialize test environment.");
+        } finally {
+            setIsRequestingPermissions(false);
         }
     };
 
-    const submitTest = async (finalAnswers, timeRemaining, totalTime, customWarnings = null, customTabSwitches = null) => {
+    const submitTest = async (finalAnswers, timeRemaining, totalTime, customWarnings = null, customTabSwitches = null, customScreenshotWarnings = null) => {
         clearInterval(timerRef.current);
         document.body.classList.remove('hide-dashboard-sidebar');
 
@@ -176,6 +285,18 @@ export default function AptitudePractice() {
         if (visibilityListenerRef.current) {
             document.removeEventListener('visibilitychange', visibilityListenerRef.current);
             visibilityListenerRef.current = null;
+        }
+        if (window._cleanupKeyDown) {
+            document.removeEventListener('keydown', window._cleanupKeyDown);
+            window._cleanupKeyDown = null;
+        }
+        if (window._cleanupKeyUp) {
+            document.removeEventListener('keyup', window._cleanupKeyUp);
+            window._cleanupKeyUp = null;
+        }
+        if (window._cleanupBlur) {
+            window.removeEventListener('blur', window._cleanupBlur);
+            window._cleanupBlur = null;
         }
 
         if (document.fullscreenElement) {
@@ -190,6 +311,7 @@ export default function AptitudePractice() {
         const timeTaken = (totalTime || (selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60)) - timeRemaining;
         const violationsCount = customWarnings !== null ? customWarnings : warnings;
         const tabViolationsCount = customTabSwitches !== null ? customTabSwitches : tabSwitches;
+        const screenshotViolationsCount = customScreenshotWarnings !== null ? customScreenshotWarnings : screenshotWarnings;
 
         // Ensure all questions are included in the submission
         const completeAnswers = questions.map(q => {
@@ -203,12 +325,28 @@ export default function AptitudePractice() {
                 answers: completeAnswers,
                 time_taken_seconds: timeTaken,
                 fullscreen_violations: violationsCount,
-                tab_violations: tabViolationsCount
+                tab_violations: tabViolationsCount,
+                screenshot_violations: screenshotViolationsCount,
+                proctoring_logs: proctoringLogsRef.current
             });
             setResults(res.data);
             setStatus('RESULTS');
         } catch (error) {
             toast.error("Failed to submit test.");
+        }
+    };
+
+    const addProctoringLog = (type, message, severity) => {
+        const logEntry = { type, message, severity, timestamp: new Date().toISOString() };
+        proctoringLogsRef.current = [...proctoringLogsRef.current, logEntry];
+        setProctoringLogs(proctoringLogsRef.current);
+        
+        if (severity === 'severe' && status === 'PLAYING') {
+            setSevereViolationMsg(message);
+            // Give the candidate a chance to read the severe warning before auto-submitting
+            setTimeout(() => {
+                 submitTest(answers, timer, (selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60));
+            }, 4000);
         }
     };
 
@@ -223,10 +361,10 @@ export default function AptitudePractice() {
     // Force re-enter fullscreen after the ESC warning dialog is dismissed
     const dismissEscWarning = async () => {
         setShowEscWarningDialog(false);
-        if (warnings + tabSwitches >= 3) {
+        if (totalViolations >= 3) {
             // 3rd violation: auto-submit
             const totalTime = selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60;
-            await submitTest(answers, timer, totalTime, warnings, tabSwitches);
+            await submitTest(answers, timer, totalTime, warnings, tabSwitches, screenshotWarnings);
         } else {
             // Re-enter fullscreen
             try {
@@ -241,10 +379,19 @@ export default function AptitudePractice() {
 
     const dismissTabWarning = async () => {
         setShowTabWarningDialog(false);
-        if (warnings + tabSwitches >= 3) {
+        if (totalViolations >= 3) {
             // 3rd violation: auto-submit
             const totalTime = selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60;
-            await submitTest(answers, timer, totalTime, warnings, tabSwitches);
+            await submitTest(answers, timer, totalTime, warnings, tabSwitches, screenshotWarnings);
+        }
+    };
+
+    const dismissScreenshotWarning = async () => {
+        setShowScreenshotWarningDialog(false);
+        if (totalViolations >= 3) {
+            // 3rd violation: auto-submit
+            const totalTime = selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60;
+            await submitTest(answers, timer, totalTime, warnings, tabSwitches, screenshotWarnings);
         }
     };
 
@@ -341,7 +488,7 @@ export default function AptitudePractice() {
                     ))}
                 </div>
 
-                <button onClick={startTest} className="btn-primary text-xl px-14 py-4 rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 transition-all font-bold">
+                <button onClick={prepareTest} className="btn-primary text-xl px-14 py-4 rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 transition-all font-bold">
                     Start {selectedCategory === 'FULL_TEST' ? 'Full Assessment' : 'Practice Test'}
                 </button>
             </div>
@@ -387,28 +534,71 @@ export default function AptitudePractice() {
                     </div>
                 </div>
 
-                {(results.fullscreen_violations > 0 || results.tab_violations > 0) && (
-                    <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-4">
-                        <XCircle className="text-red-500 mt-0.5 flex-shrink-0" size={24} />
-                        <div>
-                            <h4 className="text-red-400 font-bold mb-1">Testing Integrity Warning</h4>
-                            {results.fullscreen_violations > 0 && (
-                                <p className="text-red-300 text-sm mb-1">
-                                    Candidate attempted to exit full-screen mode {results.fullscreen_violations} time(s).
-                                </p>
-                            )}
-                            {results.tab_violations > 0 && (
-                                <p className="text-red-300 text-sm mb-1">
-                                    Candidate attempted to switch browser tabs {results.tab_violations} time(s).
-                                </p>
-                            )}
-                            {(results.fullscreen_violations + (results.tab_violations || 0)) >= 3 && (
-                                <p className="text-red-400 font-bold text-sm mt-2">
-                                    The test was automatically submitted due to exceeding the maximum allowed violations.
-                                </p>
-                            )}
+                {results.proctoring_logs && results.proctoring_logs.length > 0 ? (
+                    <div className="mb-8 p-5 bg-slate-900 border border-red-500/30 rounded-xl">
+                        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-800">
+                            <ShieldAlert className="text-red-500" size={24} />
+                            <h3 className="text-lg font-bold text-white">Proctoring Intervention Logs</h3>
+                            <span className="ml-auto bg-red-500/20 text-red-400 text-xs font-bold px-3 py-1 rounded-full">
+                                {results.proctoring_logs.length} Infraction{results.proctoring_logs.length > 1 ? 's' : ''}
+                            </span>
                         </div>
+                        <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                            {results.proctoring_logs.map((log, idx) => (
+                                <div key={idx} className={`p-3 rounded-lg border flex items-start gap-3 ${log.severity === 'severe' ? 'bg-red-500/10 border-red-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
+                                    <div className="mt-0.5">
+                                        {log.severity === 'severe' ? <XCircle size={18} className="text-red-400" /> : <AlertTriangle size={18} className="text-amber-400" />}
+                                    </div>
+                                    <div>
+                                        <p className={`font-semibold text-sm mb-1 ${log.severity === 'severe' ? 'text-red-300' : 'text-amber-300'}`}>{log.message}</p>
+                                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                                            <span className="uppercase tracking-wider font-bold opacity-80">{log.type.replace(/_/g, ' ')}</span>
+                                            <span>•</span>
+                                            <span>{new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        {results.proctoring_logs.some(l => l.severity === 'severe') && (
+                            <div className="mt-4 text-center p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
+                                <p className="text-red-400 font-bold text-sm">
+                                    Severe testing protocol violations were detected. Your test was automatically terminated and submitted.
+                                </p>
+                            </div>
+                        )}
+                        {((results.fullscreen_violations || 0) + (results.tab_violations || 0) + (results.screenshot_violations || 0)) >= 3 && !results.proctoring_logs.some(l => l.severity === 'severe') && (
+                            <div className="mt-4 text-center p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
+                                <p className="text-red-400 font-bold text-sm">
+                                    The test was automatically submitted due to exceeding the maximum allowed suspicious actions (3).
+                                </p>
+                            </div>
+                        )}
                     </div>
+                ) : (
+                    (results.fullscreen_violations > 0 || results.tab_violations > 0 || results.screenshot_violations > 0) && (
+                        <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-4">
+                            <XCircle className="text-red-500 mt-0.5 flex-shrink-0" size={24} />
+                            <div>
+                                <h4 className="text-red-400 font-bold mb-1">Testing Integrity Warning</h4>
+                                {results.fullscreen_violations > 0 && (
+                                    <p className="text-red-300 text-sm mb-1">
+                                        Candidate attempted to exit full-screen mode {results.fullscreen_violations} time(s).
+                                    </p>
+                                )}
+                                {results.tab_violations > 0 && (
+                                    <p className="text-red-300 text-sm mb-1">
+                                        Candidate attempted to switch browser tabs {results.tab_violations} time(s).
+                                    </p>
+                                )}
+                                {results.screenshot_violations > 0 && (
+                                    <p className="text-red-300 text-sm mb-1">
+                                        Candidate attempted to take screenshots {results.screenshot_violations} time(s).
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )
                 )}
 
                 <h3 className="font-bold text-xl text-white mb-4 mt-6">Detailed Paper Review</h3>
@@ -482,6 +672,86 @@ export default function AptitudePractice() {
         );
     }
 
+    // Pre-Test Instructions & Permissions Modal
+    if (status === 'PRE_TEST_INSTRUCTIONS') {
+        return (
+            <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 z-50">
+                <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
+                    <div className="bg-slate-800 p-6 border-b border-slate-700 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <ShieldAlert className="text-amber-400" size={28} />
+                            <h2 className="text-2xl font-black text-white">Security & Permissions</h2>
+                        </div>
+                    </div>
+                    <div className="p-8 overflow-y-auto flex-1 text-slate-300">
+                        <p className="mb-6 text-lg">
+                            This assessment is strictly proctored to ensure fairness and integrity. Before you begin, please read the following guidelines:
+                        </p>
+                        
+                        <div className="space-y-4 mb-8">
+                            <div className="flex items-start gap-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                                <div className="p-2 bg-red-500/10 rounded-lg shrink-0 mt-0.5">
+                                    <MonitorOff className="text-red-400" size={20} />
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-bold mb-1">No Exiting Fullscreen</h4>
+                                    <p className="text-sm text-slate-400">Exiting the fullscreen testing environment will be recorded as a violation.</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-start gap-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                                <div className="p-2 bg-red-500/10 rounded-lg shrink-0 mt-0.5">
+                                    <Files className="text-red-400" size={20} />
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-bold mb-1">No Tab Switching</h4>
+                                    <p className="text-sm text-slate-400">Navigating to other tabs or applications is strictly prohibited.</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-start gap-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                                <div className="p-2 bg-red-500/10 rounded-lg shrink-0 mt-0.5">
+                                    <CameraOff className="text-red-400" size={20} />
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-bold mb-1">No Screenshots or Copying</h4>
+                                    <p className="text-sm text-slate-400">Attempting to capture or highlight test materials will trigger an immediate warning.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-5 mb-2">
+                            <h4 className="text-indigo-400 font-bold mb-2 flex items-center gap-2">
+                                <Video size={18} /> Camera and Microphone Access Required
+                            </h4>
+                            <p className="text-sm text-indigo-300">
+                                You must grant permission to your camera and microphone on the next prompt. The test cannot begin without these permissions.
+                            </p>
+                        </div>
+                        <p className="text-red-400 font-bold mt-6 text-center text-sm">
+                            Exceeding 3 total violations will result in automatic test submission.
+                        </p>
+                    </div>
+                    <div className="p-6 border-t border-slate-700 bg-slate-800 flex justify-end gap-4">
+                        <button 
+                            onClick={() => setStatus('LANDING')} 
+                            className="px-6 py-3 font-semibold text-slate-400 hover:text-white transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={startActualTest} 
+                            disabled={isRequestingPermissions}
+                            className={`btn-primary px-8 py-3 rounded-xl font-bold transition-all flex items-center gap-2 ${isRequestingPermissions ? 'opacity-70 cursor-wait' : ''}`}
+                        >
+                            {isRequestingPermissions ? 'Requesting...' : 'I Understand & Enable Camera/Mic'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     // Helper: get palette color class per question index
     const getPaletteColor = (idx) => {
         const qId = questions[idx]?.id;
@@ -495,7 +765,43 @@ export default function AptitudePractice() {
     if (!q) return <div className="text-slate-400 p-10 text-center">Loading test environment…</div>;
 
     return (
-        <div className="flex gap-4 h-screen w-full fixed inset-0 bg-slate-950 overflow-hidden">
+        <div 
+            className="flex gap-4 h-screen w-full fixed inset-0 bg-slate-950 overflow-hidden select-none"
+            onCopy={(e) => {
+                e.preventDefault();
+                addProctoringLog('copy_attempt', 'Attempted to copy test content.', 'warning');
+                toast.error("Copying text is not allowed during the test.");
+            }}
+            onCut={(e) => {
+                e.preventDefault();
+                addProctoringLog('cut_attempt', 'Attempted to cut test content.', 'warning');
+                toast.error("Cutting text is not allowed during the test.");
+            }}
+            onPaste={(e) => {
+                e.preventDefault();
+                addProctoringLog('paste_attempt', 'Attempted to paste content.', 'warning');
+                toast.error("Pasting text is not allowed during the test.");
+            }}
+            onContextMenu={(e) => {
+                e.preventDefault();
+                addProctoringLog('right_click', 'Attempted to open context menu.', 'warning');
+                toast.error("Right-click is disabled during the test.");
+            }}
+            onDragStart={(e) => e.preventDefault()}
+        >
+            
+            {/* Severe Violation Overlay (Auto-Submit Lock) */}
+            {severeViolationMsg && (
+                <div className="fixed inset-0 z-[100] bg-red-950 flex flex-col items-center justify-center p-6 text-center animate-[fadeIn_0.2s_ease] backdrop-blur-md">
+                    <ShieldAlert className="text-red-500 mb-6 animate-pulse" size={80} />
+                    <h2 className="text-4xl font-black text-white mb-4">Severe Violation Detected</h2>
+                    <p className="text-xl text-red-300 font-bold mb-8 max-w-2xl">{severeViolationMsg}</p>
+                    <div className="flex items-center gap-3 text-slate-400">
+                        <div className="w-5 h-5 rounded-full border-2 border-slate-500 border-t-slate-300 animate-spin" />
+                        Terminating and Automating Test Submission...
+                    </div>
+                </div>
+            )}
 
             {/* ── Left: Question Palette ── */}
             <aside className="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col overflow-hidden">
@@ -559,10 +865,10 @@ export default function AptitudePractice() {
                         <div className="flex items-center gap-4">
                             {/* Warnings Tracker */}
                             <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm ${
-                                (warnings + tabSwitches) > 0 ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20' : 'text-slate-400 bg-slate-800 border border-slate-700'
+                                totalViolations > 0 ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20' : 'text-slate-400 bg-slate-800 border border-slate-700'
                             }`}>
                                 <Activity size={16} /> 
-                                Violations: {warnings + tabSwitches}/3
+                                Violations: {totalViolations}/3
                             </div>
                             
                             {/* Timer */}
@@ -624,6 +930,21 @@ export default function AptitudePractice() {
                 </div>
             </div>
 
+            {/* AI Webcam Proctoring Monitor */}
+            {status === 'PLAYING' && (
+                <ProctoringMonitor
+                    testId="aptitude_practice"
+                    onViolation={(violation) => {
+                        // Using our generic add logic. If 'severe', it auto-submits.
+                        addProctoringLog(violation.type, violation.msg, violation.severity);
+                        
+                        if (violation.severity !== 'severe') {
+                            toast.error(`Warning: ${violation.msg}`, { duration: 5000 });
+                        }
+                    }}
+                />
+            )}
+
             {/* Custom Submit Confirmation Dialog */}
             {showSubmitDialog && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -658,11 +979,11 @@ export default function AptitudePractice() {
                             <XCircle className="text-red-500" size={36} />
                         </div>
 
-                        {(warnings + tabSwitches) >= 3 ? (
+                        {totalViolations >= 3 ? (
                             <>
                                 <h2 className="text-2xl font-black text-red-400 mb-2">Test Terminated!</h2>
                                 <p className="text-slate-300 text-sm leading-relaxed mb-6">
-                                    You have exceeded the maximum of <span className="text-red-400 font-bold">3 violations</span> (exiting fullscreen or switching tabs).
+                                    You have exceeded the maximum of <span className="text-red-400 font-bold">3 violations</span> (exiting fullscreen, switching tabs, or taking screenshots).
                                     Your test has been <span className="font-bold text-red-400">automatically submitted</span>.
                                 </p>
                             </>
@@ -676,7 +997,7 @@ export default function AptitudePractice() {
                                     You will be returned to full-screen mode immediately.
                                 </p>
                                 <div className="mt-3 mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 border border-red-500/30">
-                                    <span className="text-red-400 font-bold text-sm">Warning {warnings + tabSwitches} / 3</span>
+                                    <span className="text-red-400 font-bold text-sm">Warning {totalViolations} / 3</span>
                                     <span className="text-slate-400 text-xs">— 3 violations auto-submits the test</span>
                                 </div>
                             </>
@@ -685,12 +1006,12 @@ export default function AptitudePractice() {
                         <button
                             onClick={dismissEscWarning}
                             className={`w-full py-3 rounded-xl font-bold text-white transition-all ${
-                                (warnings + tabSwitches) >= 3
+                                totalViolations >= 3
                                     ? 'bg-red-600 hover:bg-red-500'
                                     : 'bg-indigo-600 hover:bg-indigo-500'
                             }`}
                         >
-                            {(warnings + tabSwitches) >= 3 ? 'View Results' : 'Return to Full-Screen'}
+                            {totalViolations >= 3 ? 'View Results' : 'Return to Full-Screen'}
                         </button>
                     </div>
                 </div>
@@ -706,11 +1027,11 @@ export default function AptitudePractice() {
                             <XCircle className="text-red-500" size={36} />
                         </div>
 
-                        {(warnings + tabSwitches) >= 3 ? (
+                        {totalViolations >= 3 ? (
                             <>
                                 <h2 className="text-2xl font-black text-red-400 mb-2">Test Terminated!</h2>
                                 <p className="text-slate-300 text-sm leading-relaxed mb-6">
-                                    You have exceeded the maximum of <span className="text-red-400 font-bold">3 violations</span> (exiting fullscreen or switching tabs).
+                                    You have exceeded the maximum of <span className="text-red-400 font-bold">3 violations</span> (exiting fullscreen, switching tabs, or taking screenshots).
                                     Your test has been <span className="font-bold text-red-400">automatically submitted</span>.
                                 </p>
                             </>
@@ -721,7 +1042,7 @@ export default function AptitudePractice() {
                                     Switching browser tabs or minimizing the window is <span className="text-red-400 font-bold">not allowed</span> during the test.
                                 </p>
                                 <div className="mt-3 mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 border border-red-500/30">
-                                    <span className="text-red-400 font-bold text-sm">Warning {warnings + tabSwitches} / 3</span>
+                                    <span className="text-red-400 font-bold text-sm">Warning {totalViolations} / 3</span>
                                     <span className="text-slate-400 text-xs">— 3 violations auto-submits the test</span>
                                 </div>
                             </>
@@ -730,12 +1051,57 @@ export default function AptitudePractice() {
                         <button
                             onClick={dismissTabWarning}
                             className={`w-full py-3 rounded-xl font-bold text-white transition-all ${
-                                (warnings + tabSwitches) >= 3
+                                totalViolations >= 3
                                     ? 'bg-red-600 hover:bg-red-500'
                                     : 'bg-indigo-600 hover:bg-indigo-500'
                             }`}
                         >
-                            {(warnings + tabSwitches) >= 3 ? 'View Results' : 'Return to Test'}
+                            {totalViolations >= 3 ? 'View Results' : 'Return to Test'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Screenshot Warning Dialog */}
+            {showScreenshotWarningDialog && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                    <div className="relative bg-slate-900 border-2 border-red-500/60 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center animate-[fadeIn_0.2s_ease]">
+                        {/* Icon */}
+                        <div className="w-16 h-16 rounded-full bg-red-500/15 flex items-center justify-center mx-auto mb-4">
+                            <XCircle className="text-red-500" size={36} />
+                        </div>
+
+                        {totalViolations >= 3 ? (
+                            <>
+                                <h2 className="text-2xl font-black text-red-400 mb-2">Test Terminated!</h2>
+                                <p className="text-slate-300 text-sm leading-relaxed mb-6">
+                                    You have exceeded the maximum of <span className="text-red-400 font-bold">3 violations</span> (exiting fullscreen, switching tabs, or taking screenshots).
+                                    Your test has been <span className="font-bold text-red-400">automatically submitted</span>.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <h2 className="text-xl font-black text-yellow-400 mb-2">⚠ Focus Violation</h2>
+                                <p className="text-slate-300 text-sm leading-relaxed mb-2">
+                                    Taking screenshots is <span className="text-red-400 font-bold">not allowed</span> during the test.
+                                </p>
+                                <div className="mt-3 mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 border border-red-500/30">
+                                    <span className="text-red-400 font-bold text-sm">Warning {totalViolations} / 3</span>
+                                    <span className="text-slate-400 text-xs">— 3 violations auto-submits the test</span>
+                                </div>
+                            </>
+                        )}
+
+                        <button
+                            onClick={dismissScreenshotWarning}
+                            className={`w-full py-3 rounded-xl font-bold text-white transition-all ${
+                                totalViolations >= 3
+                                    ? 'bg-red-600 hover:bg-red-500'
+                                    : 'bg-indigo-600 hover:bg-indigo-500'
+                            }`}
+                        >
+                            {totalViolations >= 3 ? 'View Results' : 'Return to Test'}
                         </button>
                     </div>
                 </div>

@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from .models import Interview, Question, Attempt, PracticeInterview, PracticeAttempt, AptitudeQuestion, AptitudeTestResult, InterviewSchedule, InterviewAttempt
+from .models import (Interview, Question, Attempt, PracticeInterview, PracticeAttempt, 
+                     AptitudeQuestion, AptitudeTestResult, InterviewSchedule, 
+                     InterviewAttempt, ProctoringViolation)
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -71,3 +73,10 @@ class AptitudeTestResultSerializer(serializers.ModelSerializer):
         model = AptitudeTestResult
         fields = ['id', 'category', 'score', 'total_questions', 'time_taken_seconds', 'domain_scores', 'detailed_responses', 'fullscreen_violations', 'tab_violations', 'completed_at']
         read_only_fields = ['completed_at']
+
+
+class ProctoringViolationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProctoringViolation
+        fields = ['id', 'user', 'test_id', 'violation_type', 'timestamp']
+        read_only_fields = ['user', 'timestamp']

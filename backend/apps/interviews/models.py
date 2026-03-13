@@ -124,10 +124,35 @@ class AptitudeTestResult(models.Model):
     # Track tab switching violations
     tab_violations = models.IntegerField(default=0)
     
-    completed_at = models.DateTimeField(auto_now_add=True)
+    # Track screenshot violations
+    screenshot_violations = models.IntegerField(default=0)
+    
+    # Comprehensive log of all proctoring infractions throughout the test
+    proctoring_logs = models.JSONField(default=list, blank=True)
+    
+    completed_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.category} Test: {self.score}/{self.total_questions}"
+        return f"{self.user.username} - {self.category} - {self.score}"
+
+
+# ─── PROCTORING ─────────────────────────────────────────────────────────────
+
+class ProctoringViolation(models.Model):
+    VIOLATION_TYPES = [
+        ('phone_detected', 'Phone Detected'),
+        ('multiple_persons', 'Multiple Persons Detected'),
+        ('no_face_detected', 'No Face Detected'),
+        ('tab_switch', 'Tab Switch'),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='proctoring_violations')
+    test_id = models.CharField(max_length=100, help_text="Identifier for the test (e.g., 'aptitude_1' or 'interview_5')")
+    violation_type = models.CharField(max_length=50, choices=VIOLATION_TYPES)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.get_violation_type_display()} at {self.timestamp}"
 
 
 # ─── NEW AI INTERVIEW SYSTEM MODELS (V2) ────────────────────────────────────

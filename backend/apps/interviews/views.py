@@ -4,11 +4,14 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from .models import Interview, Attempt, Question, PracticeInterview, PracticeAttempt, AptitudeQuestion, AptitudeTestResult, InterviewSchedule, InterviewAttempt
+from .models import (Interview, Attempt, Question, PracticeInterview, PracticeAttempt, 
+                     AptitudeQuestion, AptitudeTestResult, InterviewSchedule, 
+                     InterviewAttempt, ProctoringViolation)
 from .serializers import (InterviewSerializer, AttemptSerializer, QuestionSerializer,
                           PracticeInterviewSerializer, PracticeAttemptSerializer,
                           AptitudeQuestionSerializer, AptitudeTestResultSerializer,
-                          InterviewScheduleSerializer, InterviewAttemptSerializer)
+                          InterviewScheduleSerializer, InterviewAttemptSerializer,
+                          ProctoringViolationSerializer)
 from apps.jobs.models import Application
 from .tasks import generate_initial_question, process_interview_answer, process_practice_answer
 
@@ -310,6 +313,8 @@ class AptitudeTestResultViewSet(viewsets.ModelViewSet):
         answers_data = request.data.get('answers', [])
         fullscreen_violations = request.data.get('fullscreen_violations', 0)
         tab_violations = request.data.get('tab_violations', 0)
+        screenshot_violations = request.data.get('screenshot_violations', 0)
+        proctoring_logs = request.data.get('proctoring_logs', [])
         
         # Initialize domain totals based on the test type (Full Test = 20 per domain, Specific = 20 for that domain)
         domain_scores = {'APTITUDE': 0, 'LOGICAL': 0, 'COMMUNICATION': 0, 'DOMAIN': 0}
@@ -370,7 +375,22 @@ class AptitudeTestResultViewSet(viewsets.ModelViewSet):
             domain_scores=formatted_domain_scores,
             detailed_responses=detailed_responses,
             fullscreen_violations=fullscreen_violations,
-            tab_violations=tab_violations
+            tab_violations=tab_violations,
+            screenshot_violations=screenshot_violations,
+            proctoring_logs=proctoring_logs
         )
-        
         return Response(self.get_serializer(result).data, status=status.HTTP_201_CREATED)
+
+
+class ProctoringViolationViewSet(viewsets.ModelViewSet):
+    serializer_class = ProctoringViolationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'HR':
+            return ProctoringViolation.objects.all()
+        return ProctoringViolation.objects.filter(user=user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
