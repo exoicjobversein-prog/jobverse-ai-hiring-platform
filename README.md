@@ -15,7 +15,8 @@
 | 📋 HR Job Management | Post, edit, delete jobs and manage all applicants |
 | 📊 Analytics Dashboards | Score trends, domain breakdowns, and hiring insights |
 | 💬 Community Chat | Real-time peer chat for students |
-| 🔒 Anti-Cheat Proctoring | Tab-switch and fullscreen-exit detection with auto-submission |
+| 🔒 Advanced AI Proctoring | Webcam object API (Phones/Multiple Faces), Audio Noise & Hardware tampering logs |
+| 🛡️ Anti-Cheat Mechanisms | Tab-switches, Fullscreen-exits, Copy-Paste blocks, and Screenshot warnings |
 | 📧 Email Automation | SMTP notifications for scheduling, acceptance, and results |
 | 🏋️ Workshops | Student workshop discovery and enrollment |
 
@@ -52,9 +53,10 @@ Register/Login → Student Dashboard
    ├── 📝 Aptitude Practice
    │      Select category (APTITUDE, LOGICAL, COMMUNICATION, DOMAIN)
    │      or take 80-question Full Readiness Test (40 min)
-   │      Fullscreen proctored — auto-submits on 3 total violations
-   │      (Tab switch + fullscreen exit combined = 3 max)
-   │      Results: score, domain breakdown, detailed answer review
+   │      Fullscreen AI proctored — continuous webcam & mic monitoring
+   │      Auto-submits instantly on Severe violations (Phones, >1 Person, Mic/Cam unplugged)
+   │      Auto-submits on 3 total Suspicious actions (Tab switch, fullscreen exit, shortcuts)
+   │      Results: score, domain breakdown, and detailed JSON Proctoring Intervention Logs
    │
    ├── 🎙️ Practice Interview
    │      AI mock interview on any topic
@@ -277,15 +279,27 @@ Register with any email — select your role (Student / HR) during registration.
 
 ---
 
-## 📝 Aptitude Test — Anti-Cheat Details
+## 📝 Advanced AI Proctoring & Anti-Cheat
 
-The Full Readiness Test and category-specific tests use fullscreen proctoring:
+The Full Readiness Test and category-specific tests operate under a strict, automated AI proctoring environment:
 
-- **Fullscreen Enforced:** Test starts in mandatory fullscreen.
-- **Unified Violation Pool:** Both fullscreen exits and tab switches share a combined limit of **3 total violations**.
-- **Live Tracker:** A `Violations: X/3` counter is always visible top-right during the test.
-- **Auto-Submission:** Exceeding 3 violations auto-submits the test immediately.
-- **Results Transparency:** The Performance Dashboard shows a breakdown of fullscreen exits and tab switches separately.
+### AI Detection Engine (TensorFlow `coco-ssd`)
+- **Object Detection:** Continuously scans the webcam feed. If a **Cell Phone** or **Multiple Persons** are detected, the test triggers a 'Severe' violation and auto-submits.
+- **Face Tracking:** Triggers a warning if the candidate's face drops out of frame for 10 seconds. Accumulating 5 "No Face" strikes auto-submits the test.
+
+### Audio & Hardware Monitoring
+- **Noise Detection:** Analyzes FFT frequencies via `AudioContext`. If loud background noise or alternative voices are sustained for 4 seconds, it triggers a 'Severe' violation and auto-submits.
+- **Hardware Disconnects:** Actively listens to `MediaStream` tracks. If a user unplugs or software-disables their microphone/camera mid-test, it auto-submits.
+
+### Suspicious Action "Strike" System
+- **Fullscreen Enforced:** Test starts in mandatory fullscreen. Exiting is a strike.
+- **Tab Switching & Visibility:** Navigating away from the window is a strike.
+- **Shortcut & Clipboard Blocking:** Right-clicks, Dragging, Snipping Tool (`Win+Shift+S`), and MacOS screenshots are suppressed or logged as strikes. Copying/Pasting text is disabled and counts as a strike.
+- **3-Strike Limit:** All minor Suspicious Actions share a unified pool. Hitting 3 strikes auto-submits the test.
+
+### Comprehensive Logging Dashboard
+- End-of-test Result Dashboards dynamically render a comprehensive JSON log of every intervention.
+- Includes exact infraction Timestamps, Warning/Severe severity tags, and descriptive reasons for each flag instead of simple numeric counts.
 
 ---
 

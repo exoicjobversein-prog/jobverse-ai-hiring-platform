@@ -11,11 +11,18 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
     const [isDetecting, setIsDetecting] = useState(false);
     const [statusText, setStatusText] = useState("Initializing Proctoring...");
     const noFaceDurationRef = useRef(0);
+    const noFaceStrikeCountRef = useRef(0);
     const noiseDurationRef = useRef(0);
     const apiCooldownRef = useRef(false);
     const audioContextRef = useRef(null);
     const analyserRef = useRef(null);
     const streamRef = useRef(null);
+
+    // Keep latest onViolation reference to prevent reset of the detection loop
+    const onViolationRef = useRef(onViolation);
+    useEffect(() => {
+        onViolationRef.current = onViolation;
+    }, [onViolation]);
 
     // Initialize TensorFlow Model
     useEffect(() => {
@@ -56,23 +63,29 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
             }
 
             if (isHardwareDisconnected) {
-                if (onViolation) onViolation({ type: 'hardware_disconnect', msg: "Camera or Microphone disconnected.", severity: 'severe' });
+                if (onViolationRef.current) onViolationRef.current({ type: 'hardware_disconnect', msg: "Camera or Microphone disconnected.", severity: 'severe' });
                 return;
             }
 
             // Audio Noise Detection
             let isNoisy = false;
             if (analyserRef.current) {
+                // Ensure audio context is running (browsers suspend it without user interaction)
+                if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+                    audioContextRef.current.resume();
+                }
+
                 const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
                 analyserRef.current.getByteFrequencyData(dataArray);
                 const average = dataArray.reduce((acc, val) => acc + val, 0) / dataArray.length;
                 
-                // Using a relative threshold depending on Mic sensitivity, normally ~40 is talk volume
-                if (average > 35) {
-                    noiseDurationRef.current += 2; // runs every 2s
-                    isNoisy = noiseDurationRef.current > 6; // 6 seconds of continuous loud noise
+                // Using a relative threshold depending on Mic sensitivity (10-15 is typically vocal range on an FFT average)
+                if (average > 15) {
+                    noiseDurationRef.current += 2; // detection loop runs every 2s
+                    isNoisy = noiseDurationRef.current >= 4; // 4 seconds of noise triggers violation
                 } else {
-                    noiseDurationRef.current = 0;
+                    // Decay instead of instant reset so brief pauses in speech don't reset the counter
+                    noiseDurationRef.current = Math.max(0, noiseDurationRef.current - 2);
                 }
             }
 
@@ -100,8 +113,17 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
                 noFaceDurationRef.current = 0;
             } else if (personCount === 0) {
                 noFaceDurationRef.current += 2; // runs every 2s
+
+                // If no face is detected for 10 seconds consecutively, it's a strike
                 if (noFaceDurationRef.current > 10) {
-                    currentViolation = { type: 'no_face_detected', msg: "Face not detected. Please stay in frame.", severity: 'warning' };
+                    noFaceStrikeCountRef.current += 1;
+                    noFaceDurationRef.current = 0; // Reset duration to require another continuous 10s for the next strike
+
+                    if (noFaceStrikeCountRef.current >= 5) {
+                        currentViolation = { type: 'no_face_detected', msg: "Face continuously not detected. Test terminated.", severity: 'severe' };
+                    } else {
+                        currentViolation = { type: 'no_face_detected', msg: `Face not detected. Please stay in frame. (Warning ${noFaceStrikeCountRef.current}/5)`, severity: 'warning' };
+                    }
                 }
             } else {
                 noFaceDurationRef.current = 0;
@@ -111,7 +133,7 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
                 apiCooldownRef.current = true;
                 
                 // Fire UI Warning & Log
-                if (onViolation) onViolation(currentViolation);
+                if (onViolationRef.current) onViolationRef.current(currentViolation);
 
                 // Send to backend (Optional Legacy support/Can be removed if purely relying on end-of-test log)
                 try {
@@ -136,11 +158,8 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
 
         return () => {
              clearInterval(interval);
-             if (audioContextRef.current) {
-                 audioContextRef.current.close().catch(e => console.log(e));
-             }
         };
-    }, [model, isDetecting, testId, onViolation]);
+    }, [model, isDetecting, testId]);
 
     const handleUserMedia = (stream) => {
         streamRef.current = stream;
