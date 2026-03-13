@@ -14,6 +14,15 @@
     font-family: 'Inter', sans-serif;
   }
 
+  /* Hide Sidebar and Header when in full screen test mode */
+  body.hide-dashboard-sidebar .dashboard-sidebar {
+    display: none !important;
+  }
+  
+  body.hide-dashboard-sidebar header {
+    display: none !important;
+  }
+
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;

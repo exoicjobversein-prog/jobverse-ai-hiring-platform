@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Star, User, ChevronDown, X, Calendar, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { Star, User, ChevronDown, X, Calendar, Clock, CheckCircle, XCircle, RefreshCw, FileText, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 
@@ -15,6 +16,9 @@ const SCHEDULE_STATUS_CONFIG = {
 };
 
 export default function HRApplications() {
+    const location = useLocation();
+    const jobId = new URLSearchParams(location.search).get('jobId');
+
     const [apps, setApps] = useState([]);
     const [schedules, setSchedules] = useState({});  // keyed by application id
     const [filter, setFilter] = useState('ALL');
@@ -31,8 +35,9 @@ export default function HRApplications() {
 
     useEffect(() => {
         const fetchAll = async () => {
+            const appsEndpoint = jobId ? `/jobs/applications/?job_id=${jobId}` : '/jobs/applications/';
             const [appsRes, schedulesRes] = await Promise.allSettled([
-                api.get('/jobs/applications/'),
+                api.get(appsEndpoint),
                 api.get('/interviews/schedules/'),
             ]);
             if (appsRes.status === 'fulfilled') setApps(appsRes.value.data);
@@ -115,13 +120,48 @@ export default function HRApplications() {
                                             <User size={18} />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-white">Applicant #{app.user || app.id}</p>
-                                            <p className="text-xs text-slate-400">Applied for Job #{app.job} · {new Date(app.created_at).toLocaleDateString()}</p>
-                                            {app.resume && app.resume_score != null && (
-                                                <span className="flex items-center gap-1 text-xs text-amber-400 mt-1">
-                                                    <Star size={11} />Resume Score: {app.resume_score}%
-                                                </span>
-                                            )}
+                                            <p className="font-bold text-white">{app.applicant_name || `Applicant #${app.user || app.id}`}</p>
+                                            {app.applicant_email && <p className="text-xs text-slate-300">{app.applicant_email}</p>}
+                                            <p className="text-xs text-slate-400 mt-0.5">Applied for: {app.job_title || `Job #${app.job}`} · {new Date(app.created_at).toLocaleDateString()}</p>
+                                            <div className="flex items-center gap-3 mt-1.5">
+                                                {app.resume && app.resume_score != null && (
+                                                    <span className="flex items-center gap-1 text-xs font-semibold text-amber-400">
+                                                        <Star size={12} className="fill-amber-400" />
+                                                        Resume Score: {app.resume_score}%
+                                                    </span>
+                                                )}
+                                                {app.resume_url && (
+                                                    <button onClick={async (e) => {
+                                                        e.preventDefault();
+                                                        try {
+                                                            // Fetch the file to force generic download instead of viewing
+                                                            const res = await fetch(app.resume_url);
+                                                            if (res.ok) {
+                                                                const blob = await res.blob();
+                                                                const url = window.URL.createObjectURL(blob);
+                                                                const a = document.createElement('a');
+                                                                a.style.display = 'none';
+                                                                a.href = url;
+                                                                
+                                                                // Use applicant name if available, replace spaces with underscores
+                                                                const safeName = (app.applicant_name || 'candidate_resume').replace(/\s+/g, '_');
+                                                                a.download = `${safeName}.pdf`;
+                                                                
+                                                                document.body.appendChild(a);
+                                                                a.click();
+                                                                window.URL.revokeObjectURL(url);
+                                                                document.body.removeChild(a);
+                                                            } else {
+                                                                toast.error("The resume file could not be found on the server. It may have been deleted.");
+                                                            }
+                                                        } catch (err) {
+                                                            toast.error("Failed to download resume file.");
+                                                        }
+                                                    }} className="flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors bg-emerald-500/10 px-2 py-0.5 rounded focus:outline-none">
+                                                        <Download size={12} /> Download Resume
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 flex-wrap justify-end">

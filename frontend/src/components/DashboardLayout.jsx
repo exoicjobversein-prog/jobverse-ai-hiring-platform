@@ -24,6 +24,7 @@ const hrNav = [
     { to: '/hr/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/hr/profile', icon: User, label: 'Profile' },
     { to: '/hr/jobs/new', icon: Plus, label: 'Post a Job' },
+    { to: '/hr/jobs', icon: Briefcase, label: 'View Jobs' },
     { to: '/hr/applications', icon: Users, label: 'Applications' },
     { to: '/hr/analytics', icon: TrendingUp, label: 'Analytics' },
 ];
@@ -49,7 +50,7 @@ export default function DashboardLayout({ user, setUser, role }) {
     return (
         <div className="flex min-h-screen bg-slate-950">
             {/* Sidebar */}
-            <aside className={`${collapsed ? 'w-16' : 'w-64'} flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300 z-30`}>
+            <aside className={`dashboard-sidebar ${collapsed ? 'w-16' : 'w-64'} flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300 z-30`}>
                 {/* Logo */}
                 <div className="flex items-center justify-between px-4 py-5 border-b border-slate-800">
                     {!collapsed && (

@@ -16,21 +16,63 @@ const getCategoryLabel = (cat) => {
 };
 
 export default function AptitudePractice() {
-    const [status, setStatus] = useState('LANDING'); // LANDING, PLAYING, RESULTS
+    const [status, setStatus] = useState('LANDING'); // LANDING, LOADING, PLAYING, RESULTS
     const [selectedCategory, setSelectedCategory] = useState('FULL_TEST');
     const [questions, setQuestions] = useState([]);
     const [current, setCurrent] = useState(0);
     const [answers, setAnswers] = useState([]); // [{question_id: 1, selected: 'A'}]
     const [timer, setTimer] = useState(TIMER_SECONDS);
     const [results, setResults] = useState(null);
+    const [warnings, setWarnings] = useState(0);
+    const [tabSwitches, setTabSwitches] = useState(0);
+    const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+    const [showEscWarningDialog, setShowEscWarningDialog] = useState(false);
+    const [showTabWarningDialog, setShowTabWarningDialog] = useState(false);
+    const [visited, setVisited] = useState(new Set()); // indices of visited questions
+    const [currentSelection, setCurrentSelection] = useState(null); // selected option for current question
     const timerRef = useRef(null);
+    const fullscreenListenerRef = useRef(null);
+    const visibilityListenerRef = useRef(null);
+    const warningsRef = useRef(0); // Keep a ref in sync for use inside event listeners
+    const tabSwitchesRef = useRef(0);
+    const intentionalExitRef = useRef(false); // Track when we intentionally exit fullscreen (submit)
 
     useEffect(() => {
-        return () => clearInterval(timerRef.current);
+        return () => {
+            clearInterval(timerRef.current);
+            if (fullscreenListenerRef.current) {
+                document.removeEventListener('fullscreenchange', fullscreenListenerRef.current);
+            }
+            if (visibilityListenerRef.current) {
+                document.removeEventListener('visibilitychange', visibilityListenerRef.current);
+            }
+            document.body.classList.remove('hide-dashboard-sidebar');
+        };
     }, []);
+
+    // Keep warningsRef in sync with warnings state
+    useEffect(() => {
+        warningsRef.current = warnings;
+    }, [warnings]);
+
+    useEffect(() => {
+        tabSwitchesRef.current = tabSwitches;
+    }, [tabSwitches]);
+
+
 
     const startTest = async () => {
         try {
+            // Browsers strictly require requestFullscreen to be called IMMEDIATELY after a user gesture (like a click).
+            // We must call it before any await/fetch calls that could delay it past the browser's 1-second grace period.
+            try {
+                if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                }
+            } catch (err) {
+                console.log("Fullscreen request failed:", err);
+            }
+
             const endpoint = selectedCategory === 'FULL_TEST'
                 ? '/interviews/aptitude/questions/full_test/'
                 : `/interviews/aptitude/questions/?category=${selectedCategory}`;
@@ -38,16 +80,74 @@ export default function AptitudePractice() {
             const res = await api.get(endpoint);
             if (res.data.length === 0) {
                 toast.error("No questions found in database.");
+                // Ensure we exit fullscreen if we fail to start
+                if (document.fullscreenElement) {
+                   document.exitFullscreen().catch(e => console.log(e));
+                }
                 return;
             }
 
-            const testTime = selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60; // 40 mins for full, 10 mins for single category
+            const testTime = selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60;
 
             setQuestions(res.data);
             setCurrent(0);
             setAnswers([]);
-            setStatus('PLAYING');
             setTimer(testTime);
+
+            // Reset all violation counters — both state AND refs
+            setWarnings(0);
+            warningsRef.current = 0;
+            setTabSwitches(0);
+            tabSwitchesRef.current = 0;
+            intentionalExitRef.current = false;
+
+            setVisited(new Set([0]));
+
+            // Register proctoring listeners IMMEDIATELY (before the loading delay)
+            // so violations during the loading screen are tracked too.
+
+            // Remove any previous listeners to avoid duplicates on re-start
+            if (fullscreenListenerRef.current) {
+                document.removeEventListener('fullscreenchange', fullscreenListenerRef.current);
+            }
+            if (visibilityListenerRef.current) {
+                document.removeEventListener('visibilitychange', visibilityListenerRef.current);
+            }
+
+            // Detect when fullscreen is exited (ESC key, F11, or any other means)
+            const handleFullscreenChange = () => {
+                if (!document.fullscreenElement) {
+                    if (intentionalExitRef.current) {
+                        intentionalExitRef.current = false;
+                        return;
+                    }
+                    const newWarnings = warningsRef.current + 1;
+                    warningsRef.current = newWarnings;
+                    setWarnings(newWarnings);
+                    setShowEscWarningDialog(true);
+                }
+            };
+            document.addEventListener('fullscreenchange', handleFullscreenChange);
+            fullscreenListenerRef.current = handleFullscreenChange;
+
+            const handleVisibilityChange = () => {
+                if (document.hidden) {
+                    if (intentionalExitRef.current) return;
+                    const newSwitches = tabSwitchesRef.current + 1;
+                    tabSwitchesRef.current = newSwitches;
+                    setTabSwitches(newSwitches);
+                    setShowTabWarningDialog(true);
+                }
+            };
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            visibilityListenerRef.current = handleVisibilityChange;
+
+            // Show loading screen for at least 4 seconds
+            setStatus('LOADING');
+            await new Promise(resolve => setTimeout(resolve, 4000));
+            setStatus('PLAYING');
+
+            document.body.classList.add('hide-dashboard-sidebar');
 
             clearInterval(timerRef.current);
             timerRef.current = setInterval(() => {
@@ -65,15 +165,45 @@ export default function AptitudePractice() {
         }
     };
 
-    const submitTest = async (finalAnswers, timeRemaining, totalTime) => {
+    const submitTest = async (finalAnswers, timeRemaining, totalTime, customWarnings = null, customTabSwitches = null) => {
         clearInterval(timerRef.current);
+        document.body.classList.remove('hide-dashboard-sidebar');
+
+        if (fullscreenListenerRef.current) {
+            document.removeEventListener('fullscreenchange', fullscreenListenerRef.current);
+            fullscreenListenerRef.current = null;
+        }
+        if (visibilityListenerRef.current) {
+            document.removeEventListener('visibilitychange', visibilityListenerRef.current);
+            visibilityListenerRef.current = null;
+        }
+
+        if (document.fullscreenElement) {
+            try {
+                intentionalExitRef.current = true;
+                await document.exitFullscreen();
+            } catch(e) {
+                intentionalExitRef.current = false;
+            }
+        }
+
         const timeTaken = (totalTime || (selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60)) - timeRemaining;
+        const violationsCount = customWarnings !== null ? customWarnings : warnings;
+        const tabViolationsCount = customTabSwitches !== null ? customTabSwitches : tabSwitches;
+
+        // Ensure all questions are included in the submission
+        const completeAnswers = questions.map(q => {
+            const ans = finalAnswers.find(a => a.question_id === q.id);
+            return ans ? ans : { question_id: q.id, selected: null };
+        });
 
         try {
             const res = await api.post('/interviews/aptitude/results/evaluate_test/', {
                 category: selectedCategory,
-                answers: finalAnswers,
-                time_taken_seconds: timeTaken
+                answers: completeAnswers,
+                time_taken_seconds: timeTaken,
+                fullscreen_violations: violationsCount,
+                tab_violations: tabViolationsCount
             });
             setResults(res.data);
             setStatus('RESULTS');
@@ -82,17 +212,88 @@ export default function AptitudePractice() {
         }
     };
 
-    const handleNext = (selectedOption) => {
-        const qId = questions[current].id;
-        const newAns = [...answers, { question_id: qId, selected: selectedOption }];
-        setAnswers(newAns);
+    // Effect to monitor warnings and auto-submit when >= 3
+    useEffect(() => {
+        if (status === 'PLAYING' && warnings >= 3) {
+            // Dialog is shown; auto-submit will happen when user dismisses it (or immediately)
+            // We don't auto-submit here to give the dialog time to render the final message
+        }
+    }, [warnings, status]);
 
+    // Force re-enter fullscreen after the ESC warning dialog is dismissed
+    const dismissEscWarning = async () => {
+        setShowEscWarningDialog(false);
+        if (warnings + tabSwitches >= 3) {
+            // 3rd violation: auto-submit
+            const totalTime = selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60;
+            await submitTest(answers, timer, totalTime, warnings, tabSwitches);
+        } else {
+            // Re-enter fullscreen
+            try {
+                if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                }
+            } catch (e) {
+                console.log('Failed to re-enter fullscreen:', e);
+            }
+        }
+    };
+
+    const dismissTabWarning = async () => {
+        setShowTabWarningDialog(false);
+        if (warnings + tabSwitches >= 3) {
+            // 3rd violation: auto-submit
+            const totalTime = selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60;
+            await submitTest(answers, timer, totalTime, warnings, tabSwitches);
+        }
+    };
+
+    // Sync selection when current question changes
+    useEffect(() => {
+        if (questions.length > 0) {
+            const existing = answers.find(a => a.question_id === questions[current]?.id);
+            setCurrentSelection(existing ? existing.selected : null);
+        }
+    }, [current, questions]);
+
+    // Select an option (no navigation)
+    const handleSelectOption = (option) => {
+        setCurrentSelection(option);
+        const qId = questions[current].id;
+        // Update (or add) the answer in the answers array
+        const exists = answers.find(a => a.question_id === qId);
+        if (exists) {
+            setAnswers(prev => prev.map(a => a.question_id === qId ? { ...a, selected: option } : a));
+        } else {
+            setAnswers(prev => [...prev, { question_id: qId, selected: option }]);
+        }
+    };
+
+    // Advance to next question (or end of test)
+    const goToNext = () => {
         if (current + 1 >= questions.length) {
             const totalTime = selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60;
-            submitTest(newAns, timer, totalTime);
+            submitTest(answers, timer, totalTime);
         } else {
-            setCurrent(c => c + 1);
+            const nextIdx = current + 1;
+            setVisited(prev => new Set([...prev, nextIdx]));
+            setCurrent(nextIdx);
         }
+    };
+
+    const jumpToQuestion = (idx) => {
+        setVisited(prev => new Set([...prev, idx]));
+        setCurrent(idx);
+    };
+
+    const handleManualSubmit = () => {
+        setShowSubmitDialog(true);
+    };
+
+    const confirmSubmit = () => {
+        setShowSubmitDialog(false);
+        const totalTime = selectedCategory === 'FULL_TEST' ? 40 * 60 : 10 * 60;
+        submitTest(answers, timer, totalTime);
     };
 
     const formatTime = (secs) => {
@@ -186,7 +387,31 @@ export default function AptitudePractice() {
                     </div>
                 </div>
 
-                <h3 className="font-bold text-xl text-white mb-4 mt-12">Detailed Paper Review</h3>
+                {(results.fullscreen_violations > 0 || results.tab_violations > 0) && (
+                    <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-4">
+                        <XCircle className="text-red-500 mt-0.5 flex-shrink-0" size={24} />
+                        <div>
+                            <h4 className="text-red-400 font-bold mb-1">Testing Integrity Warning</h4>
+                            {results.fullscreen_violations > 0 && (
+                                <p className="text-red-300 text-sm mb-1">
+                                    Candidate attempted to exit full-screen mode {results.fullscreen_violations} time(s).
+                                </p>
+                            )}
+                            {results.tab_violations > 0 && (
+                                <p className="text-red-300 text-sm mb-1">
+                                    Candidate attempted to switch browser tabs {results.tab_violations} time(s).
+                                </p>
+                            )}
+                            {(results.fullscreen_violations + (results.tab_violations || 0)) >= 3 && (
+                                <p className="text-red-400 font-bold text-sm mt-2">
+                                    The test was automatically submitted due to exceeding the maximum allowed violations.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                <h3 className="font-bold text-xl text-white mb-4 mt-6">Detailed Paper Review</h3>
                 <div className="space-y-4">
                     {results.detailed_responses?.map((r, i) => (
                         <div key={i} className={`card border-l-4 ${r.is_correct ? 'border-l-emerald-500' : 'border-l-red-500'}`}>
@@ -203,7 +428,7 @@ export default function AptitudePractice() {
                                         <div>
                                             <p className="text-slate-500 mb-1">Your Answer</p>
                                             <p className={`font-semibold ${r.is_correct ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                Option {r.selected || 'Skipped'} {r.selected ? ` - ${r[`option_${r.selected.toLowerCase()}`]}` : ''}
+                                                {r.selected ? `Option ${r.selected} - ${r[`option_${r.selected.toLowerCase()}`]}` : 'Unattempted'}
                                             </p>
                                         </div>
                                         <div>
@@ -232,46 +457,289 @@ export default function AptitudePractice() {
         );
     }
 
+    // Loading screen
+    if (status === 'LOADING') {
+        const testLabel = selectedCategory === 'FULL_TEST' ? 'Full Readiness Test' : getCategoryLabel(selectedCategory);
+        return (
+            <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-50">
+                <div className="text-center">
+                    <div className="relative mb-8">
+                        <div className="w-24 h-24 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin mx-auto" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <Brain size={28} className="text-indigo-400" />
+                        </div>
+                    </div>
+                    <h2 className="text-3xl font-black text-white mb-3">Preparing Your Test</h2>
+                    <p className="text-slate-400 text-lg mb-2">{testLabel}</p>
+                    <p className="text-slate-500 text-sm">Loading questions and securing your environment…</p>
+                    <div className="mt-8 flex items-center justify-center gap-2">
+                        {[0,1,2].map(i => (
+                            <div key={i} className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Helper: get palette color class per question index
+    const getPaletteColor = (idx) => {
+        const qId = questions[idx]?.id;
+        const isAnswered = answers.some(a => a.question_id === qId);
+        if (isAnswered) return 'bg-emerald-600 border-emerald-500 text-white'; // answered = green
+        if (visited.has(idx)) return 'bg-orange-500 border-orange-400 text-white'; // visited but not answered = orange
+        return 'bg-slate-700 border-slate-600 text-slate-300'; // unvisited = gray
+    };
+
     const q = questions[current];
     if (!q) return <div className="text-slate-400 p-10 text-center">Loading test environment…</div>;
 
     return (
-        <div className="max-w-3xl mx-auto">
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
-                <div>
-                    <span className="text-indigo-400 font-bold text-sm tracking-widest uppercase mb-1 block">
-                        {getCategoryLabel(q.category)}
-                    </span>
-                    <h1 className="text-xl font-bold text-white">Question {current + 1} <span className="text-slate-500 font-normal">/ {questions.length}</span></h1>
+        <div className="flex gap-4 h-screen w-full fixed inset-0 bg-slate-950 overflow-hidden">
+
+            {/* ── Left: Question Palette ── */}
+            <aside className="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col overflow-hidden">
+                {/* Header */}
+                <div className="p-4 border-b border-slate-800">
+                    <h3 className="text-white font-bold text-sm mb-3">Question Palette</h3>
+                    <div className="flex flex-col gap-1.5 text-xs">
+                        <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded bg-emerald-600 flex-shrink-0" />
+                            <span className="text-slate-400">Answered</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded bg-orange-500 flex-shrink-0" />
+                            <span className="text-slate-400">Visited, unanswered</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded bg-slate-700 flex-shrink-0" />
+                            <span className="text-slate-400">Not visited</span>
+                        </div>
+                    </div>
                 </div>
-                <div className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-lg ${timer <= 300 ? 'text-red-400 bg-red-500/10 border border-red-500/20' : 'text-indigo-300 bg-indigo-500/10 border border-indigo-500/20'}`}>
-                    <Clock size={20} />{formatTime(timer)}
+
+                {/* Grid of question numbers */}
+                <div className="flex-1 overflow-y-auto p-4">
+                    <div className="grid grid-cols-5 gap-1.5">
+                        {questions.map((_, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => jumpToQuestion(idx)}
+                                className={`w-full aspect-square rounded-lg text-xs font-bold border transition-all duration-150 hover:scale-105 hover:brightness-110
+                                    ${getPaletteColor(idx)}
+                                    ${current === idx ? 'ring-2 ring-white ring-offset-1 ring-offset-slate-900 scale-110' : ''}`}
+                            >
+                                {idx + 1}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
 
-            <div className="score-bar-track mb-8 h-1 z-0 relative">
-                <div className="score-bar-fill bg-gradient-to-r from-indigo-500 to-purple-500 absolute h-full top-0 left-0 transition-all duration-300" style={{ width: `${((current) / questions.length) * 100}%` }} />
-            </div>
-
-            <div className="card mb-6 py-8 border-slate-700 bg-slate-800/30">
-                <p className="text-white font-semibold text-lg leading-relaxed">{q.question_text}</p>
-            </div>
-
-            <div className="space-y-4 mb-8">
-                {optionLabels.map(l => (
-                    <button key={l} onClick={() => handleNext(l)}
-                        className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-slate-700 bg-slate-800 hover:border-indigo-500/50 hover:bg-slate-700/50 transition-all text-left group">
-                        <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 bg-slate-700 text-slate-300 group-hover:bg-indigo-500 group-hover:text-white transition-colors">{l}</span>
-                        <span className="text-slate-200 text-base">{getOptionText(q, l)}</span>
+                {/* Submit button at bottom */}
+                <div className="p-4 border-t border-slate-800">
+                    <button
+                        onClick={handleManualSubmit}
+                        className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition-colors"
+                    >
+                        Submit Test
                     </button>
-                ))}
+                </div>
+            </aside>
+
+            {/* ── Right: Question Area ── */}
+            <div className="flex-1 overflow-y-auto">
+                <div className="max-w-3xl mx-auto py-8 px-6">
+
+                    {/* Top bar */}
+                    <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
+                        <div>
+                            <span className="text-indigo-400 font-bold text-xs tracking-widest uppercase mb-1 block">{getCategoryLabel(q.category)}</span>
+                            <h1 className="text-xl font-bold text-white">Question {current + 1} <span className="text-slate-500 font-normal">/ {questions.length}</span></h1>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            {/* Warnings Tracker */}
+                            <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm ${
+                                (warnings + tabSwitches) > 0 ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20' : 'text-slate-400 bg-slate-800 border border-slate-700'
+                            }`}>
+                                <Activity size={16} /> 
+                                Violations: {warnings + tabSwitches}/3
+                            </div>
+                            
+                            {/* Timer */}
+                            <div className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-lg ${timer <= 300 ? 'text-red-400 bg-red-500/10 border border-red-500/20' : 'text-indigo-300 bg-indigo-500/10 border border-indigo-500/20'}`}>
+                                <Clock size={20} />{formatTime(timer)}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="score-bar-track mb-6 h-1 relative">
+                        <div className="score-bar-fill bg-gradient-to-r from-indigo-500 to-purple-500 absolute h-full top-0 left-0 transition-all duration-300"
+                            style={{ width: `${(answers.length / questions.length) * 100}%` }} />
+                    </div>
+
+                    {/* Question card */}
+                    <div className="card mb-6 py-8 border-slate-700 bg-slate-800/30">
+                        <p className="text-white font-semibold text-lg leading-relaxed">{q.question_text}</p>
+                    </div>
+
+                    {/* Options */}
+                    <div className="space-y-3 mb-6">
+                        {optionLabels.map(l => {
+                            const isSelected = currentSelection === l;
+                            return (
+                                <button key={l} onClick={() => handleSelectOption(l)}
+                                    className={`w-full flex items-center gap-4 px-5 py-4 rounded-xl border transition-all text-left ${
+                                        isSelected
+                                            ? 'border-indigo-500 bg-indigo-600/20 ring-1 ring-indigo-500'
+                                            : 'border-slate-700 bg-slate-800 hover:border-indigo-500/50 hover:bg-slate-700/50'
+                                    }`}>
+                                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${
+                                        isSelected ? 'bg-indigo-500 text-white' : 'bg-slate-700 text-slate-300'
+                                    }`}>{l}</span>
+                                    <span className="text-slate-200 text-base">{getOptionText(q, l)}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Navigation */}
+                    <div className="flex items-center justify-between mt-2">
+                        <button onClick={goToNext} className="text-slate-400 hover:text-white font-medium px-4 py-2 transition-colors">
+                            Skip
+                        </button>
+                        <button
+                            onClick={goToNext}
+                            disabled={!currentSelection}
+                            className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-colors ${
+                                currentSelection
+                                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                                    : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                            }`}
+                        >
+                            {current + 1 === questions.length ? 'Finish' : 'Save & Next →'}
+                        </button>
+                    </div>
+
+                </div>
             </div>
 
-            <div className="flex justify-between items-center mt-8">
-                <button onClick={() => handleNext(null)} className="text-slate-400 hover:text-white font-medium px-4 py-2 transition-colors">
-                    Skip Question
-                </button>
-            </div>
+            {/* Custom Submit Confirmation Dialog */}
+            {showSubmitDialog && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+                    <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+                        <p className="text-white font-semibold text-lg mb-6">Do you want to submit the test?</p>
+                        <div className="flex gap-3 justify-center">
+                            <button
+                                onClick={() => setShowSubmitDialog(false)}
+                                className="flex-1 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold transition-colors border border-slate-700"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmSubmit}
+                                className="flex-1 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors"
+                            >
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ESC / Fullscreen Warning Dialog */}
+            {showEscWarningDialog && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                    <div className="relative bg-slate-900 border-2 border-red-500/60 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center animate-[fadeIn_0.2s_ease]">
+                        {/* Icon */}
+                        <div className="w-16 h-16 rounded-full bg-red-500/15 flex items-center justify-center mx-auto mb-4">
+                            <XCircle className="text-red-500" size={36} />
+                        </div>
+
+                        {(warnings + tabSwitches) >= 3 ? (
+                            <>
+                                <h2 className="text-2xl font-black text-red-400 mb-2">Test Terminated!</h2>
+                                <p className="text-slate-300 text-sm leading-relaxed mb-6">
+                                    You have exceeded the maximum of <span className="text-red-400 font-bold">3 violations</span> (exiting fullscreen or switching tabs).
+                                    Your test has been <span className="font-bold text-red-400">automatically submitted</span>.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <h2 className="text-xl font-black text-yellow-400 mb-2">⚠ Fullscreen Warning</h2>
+                                <p className="text-slate-300 text-sm leading-relaxed mb-2">
+                                    Exiting full-screen mode is <span className="text-red-400 font-bold">not allowed</span> during the test.
+                                </p>
+                                <p className="text-slate-400 text-sm mb-1">
+                                    You will be returned to full-screen mode immediately.
+                                </p>
+                                <div className="mt-3 mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 border border-red-500/30">
+                                    <span className="text-red-400 font-bold text-sm">Warning {warnings + tabSwitches} / 3</span>
+                                    <span className="text-slate-400 text-xs">— 3 violations auto-submits the test</span>
+                                </div>
+                            </>
+                        )}
+
+                        <button
+                            onClick={dismissEscWarning}
+                            className={`w-full py-3 rounded-xl font-bold text-white transition-all ${
+                                (warnings + tabSwitches) >= 3
+                                    ? 'bg-red-600 hover:bg-red-500'
+                                    : 'bg-indigo-600 hover:bg-indigo-500'
+                            }`}
+                        >
+                            {(warnings + tabSwitches) >= 3 ? 'View Results' : 'Return to Full-Screen'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Tab Switching Warning Dialog */}
+            {showTabWarningDialog && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                    <div className="relative bg-slate-900 border-2 border-red-500/60 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center animate-[fadeIn_0.2s_ease]">
+                        {/* Icon */}
+                        <div className="w-16 h-16 rounded-full bg-red-500/15 flex items-center justify-center mx-auto mb-4">
+                            <XCircle className="text-red-500" size={36} />
+                        </div>
+
+                        {(warnings + tabSwitches) >= 3 ? (
+                            <>
+                                <h2 className="text-2xl font-black text-red-400 mb-2">Test Terminated!</h2>
+                                <p className="text-slate-300 text-sm leading-relaxed mb-6">
+                                    You have exceeded the maximum of <span className="text-red-400 font-bold">3 violations</span> (exiting fullscreen or switching tabs).
+                                    Your test has been <span className="font-bold text-red-400">automatically submitted</span>.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <h2 className="text-xl font-black text-yellow-400 mb-2">⚠ Focus Violation</h2>
+                                <p className="text-slate-300 text-sm leading-relaxed mb-2">
+                                    Switching browser tabs or minimizing the window is <span className="text-red-400 font-bold">not allowed</span> during the test.
+                                </p>
+                                <div className="mt-3 mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 border border-red-500/30">
+                                    <span className="text-red-400 font-bold text-sm">Warning {warnings + tabSwitches} / 3</span>
+                                    <span className="text-slate-400 text-xs">— 3 violations auto-submits the test</span>
+                                </div>
+                            </>
+                        )}
+
+                        <button
+                            onClick={dismissTabWarning}
+                            className={`w-full py-3 rounded-xl font-bold text-white transition-all ${
+                                (warnings + tabSwitches) >= 3
+                                    ? 'bg-red-600 hover:bg-red-500'
+                                    : 'bg-indigo-600 hover:bg-indigo-500'
+                            }`}
+                        >
+                            {(warnings + tabSwitches) >= 3 ? 'View Results' : 'Return to Test'}
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -14,6 +14,8 @@ class JobSerializer(serializers.ModelSerializer):
 class ApplicationSerializer(serializers.ModelSerializer):
     job_title = serializers.CharField(source='job.title', read_only=True)
     applicant_username = serializers.CharField(source='user.username', read_only=True)
+    applicant_name = serializers.SerializerMethodField()
+    applicant_email = serializers.CharField(source='user.email', read_only=True)
     resume_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -21,6 +23,10 @@ class ApplicationSerializer(serializers.ModelSerializer):
         fields = '__all__'
         # Note: 'status' is NOT read_only so HR can PATCH it
         read_only_fields = ('user', 'created_at')
+
+    def get_applicant_name(self, obj):
+        name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return name if name else obj.user.username
 
     def get_resume_url(self, obj):
         if obj.resume and obj.resume.file:

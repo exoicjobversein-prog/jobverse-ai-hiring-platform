@@ -118,6 +118,12 @@ class AptitudeTestResult(models.Model):
     # Store detailed Q&A responses for review: [{"question_id": 1, "selected": "A", "correct": "C", ...}]
     detailed_responses = models.JSONField(default=list, blank=True)
     
+    # Track full screen violations
+    fullscreen_violations = models.IntegerField(default=0)
+    
+    # Track tab switching violations
+    tab_violations = models.IntegerField(default=0)
+    
     completed_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

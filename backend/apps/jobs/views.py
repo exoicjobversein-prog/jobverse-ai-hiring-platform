@@ -13,6 +13,16 @@ class JobViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=['get'], url_path='my-jobs')
+    def my_jobs(self, request):
+        queryset = self.get_queryset().filter(created_by=request.user)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
         
     @action(detail=True, methods=['post'], url_path='apply')
     def apply_to_job(self, request, pk=None):
@@ -49,12 +59,20 @@ class ApplicationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        job_id = self.request.query_params.get('job_id')
+
         if user.role == 'HR' or user.role == 'ADMIN':
             # HR sees all applications for jobs they created
-            return Application.objects.filter(job__created_by=user)
+            qs = Application.objects.filter(job__created_by=user)
+            if job_id:
+                qs = qs.filter(job_id=job_id)
+            return qs
         
         # Students see only their own
-        return Application.objects.filter(user=user)
+        qs = Application.objects.filter(user=user)
+        if job_id:
+            qs = qs.filter(job_id=job_id)
+        return qs
 
     def perform_update(self, serializer):
         old_status = serializer.instance.status

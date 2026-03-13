@@ -308,9 +308,20 @@ class AptitudeTestResultViewSet(viewsets.ModelViewSet):
         category = request.data.get('category', 'FULL_TEST')
         time_taken = request.data.get('time_taken_seconds', 0)
         answers_data = request.data.get('answers', [])
+        fullscreen_violations = request.data.get('fullscreen_violations', 0)
+        tab_violations = request.data.get('tab_violations', 0)
         
+        # Initialize domain totals based on the test type (Full Test = 20 per domain, Specific = 20 for that domain)
         domain_scores = {'APTITUDE': 0, 'LOGICAL': 0, 'COMMUNICATION': 0, 'DOMAIN': 0}
         domain_totals = {'APTITUDE': 0, 'LOGICAL': 0, 'COMMUNICATION': 0, 'DOMAIN': 0}
+        
+        if category == 'FULL_TEST':
+            total_questions = 80
+            domain_totals = {'APTITUDE': 20, 'LOGICAL': 20, 'COMMUNICATION': 20, 'DOMAIN': 20}
+        else:
+            total_questions = 20
+            domain_totals[category] = 20
+            
         total_score = 0
         detailed_responses = []
 
@@ -330,8 +341,6 @@ class AptitudeTestResultViewSet(viewsets.ModelViewSet):
             if is_correct:
                 total_score += 1
                 domain_scores[q.category] = domain_scores.get(q.category, 0) + 1
-            
-            domain_totals[q.category] = domain_totals.get(q.category, 0) + 1
             
             detailed_responses.append({
                 "question_id": q.id,
@@ -356,10 +365,12 @@ class AptitudeTestResultViewSet(viewsets.ModelViewSet):
             user=request.user,
             category=category,
             score=total_score,
-            total_questions=len(answers_data),
+            total_questions=total_questions,
             time_taken_seconds=time_taken,
             domain_scores=formatted_domain_scores,
-            detailed_responses=detailed_responses
+            detailed_responses=detailed_responses,
+            fullscreen_violations=fullscreen_violations,
+            tab_violations=tab_violations
         )
         
         return Response(self.get_serializer(result).data, status=status.HTTP_201_CREATED)

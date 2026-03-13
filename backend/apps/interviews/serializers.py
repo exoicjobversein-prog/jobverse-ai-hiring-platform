@@ -69,5 +69,5 @@ class AptitudeQuestionSerializer(serializers.ModelSerializer):
 class AptitudeTestResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = AptitudeTestResult
-        fields = ['id', 'category', 'score', 'total_questions', 'time_taken_seconds', 'domain_scores', 'detailed_responses', 'completed_at']
+        fields = ['id', 'category', 'score', 'total_questions', 'time_taken_seconds', 'domain_scores', 'detailed_responses', 'fullscreen_violations', 'tab_violations', 'completed_at']
         read_only_fields = ['completed_at']

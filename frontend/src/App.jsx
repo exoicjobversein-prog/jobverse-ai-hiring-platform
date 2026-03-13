@@ -22,6 +22,7 @@ import StudentApplications from './pages/student/Applications';
 import HRDashboard from './pages/hr/Dashboard';
 import HRProfile from './pages/hr/Profile';
 import PostJob from './pages/hr/PostJob';
+import MyJobs from './pages/hr/MyJobs';
 import HRApplications from './pages/hr/Applications';
 import HRAnalytics from './pages/hr/Analytics';
 
@@ -105,6 +106,7 @@ export default function App() {
                     <Route index element={<Navigate to="dashboard" />} />
                     <Route path="dashboard" element={<HRDashboard user={user} />} />
                     <Route path="profile" element={<HRProfile user={user} setUser={updateUser} />} />
+                    <Route path="jobs" element={<MyJobs user={user} />} />
                     <Route path="jobs/new" element={<PostJob user={user} />} />
                     <Route path="applications" element={<HRApplications user={user} />} />
                     <Route path="analytics" element={<HRAnalytics user={user} />} />
