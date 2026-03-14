@@ -16,6 +16,11 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
     const audioContextRef = useRef(null);
     const analyserRef = useRef(null);
     const streamRef = useRef(null);
+    const onViolationRef = useRef(onViolation);
+
+    useEffect(() => {
+        onViolationRef.current = onViolation;
+    }, [onViolation]);
 
     // Initialize TensorFlow Model
     useEffect(() => {
@@ -56,7 +61,7 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
             }
 
             if (isHardwareDisconnected) {
-                if (onViolation) onViolation({ type: 'hardware_disconnect', msg: "Camera or Microphone disconnected.", severity: 'severe' });
+                if (onViolationRef.current) onViolationRef.current({ type: 'hardware_disconnect', msg: "Camera or Microphone disconnected.", severity: 'severe' });
                 return;
             }
 
@@ -111,7 +116,7 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
                 apiCooldownRef.current = true;
                 
                 // Fire UI Warning & Log
-                if (onViolation) onViolation(currentViolation);
+                if (onViolationRef.current) onViolationRef.current(currentViolation);
 
                 // Send to backend (Optional Legacy support/Can be removed if purely relying on end-of-test log)
                 try {
@@ -136,11 +141,16 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
 
         return () => {
              clearInterval(interval);
-             if (audioContextRef.current) {
+        };
+    }, [model, isDetecting, testId]);
+
+    useEffect(() => {
+        return () => {
+             if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
                  audioContextRef.current.close().catch(e => console.log(e));
              }
         };
-    }, [model, isDetecting, testId, onViolation]);
+    }, []);
 
     const handleUserMedia = (stream) => {
         streamRef.current = stream;
