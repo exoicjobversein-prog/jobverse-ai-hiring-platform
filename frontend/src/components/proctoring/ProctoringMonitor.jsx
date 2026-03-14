@@ -17,6 +17,11 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
     const audioContextRef = useRef(null);
     const analyserRef = useRef(null);
     const streamRef = useRef(null);
+    const onViolationRef = useRef(onViolation);
+
+    useEffect(() => {
+        onViolationRef.current = onViolation;
+    }, [onViolation]);
 
     // Keep latest onViolation reference to prevent reset of the detection loop
     const onViolationRef = useRef(onViolation);
@@ -158,8 +163,21 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
 
         return () => {
              clearInterval(interval);
+<<<<<<< HEAD
         };
     }, [model, isDetecting, testId]);
+=======
+        };
+    }, [model, isDetecting, testId]);
+
+    useEffect(() => {
+        return () => {
+             if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                 audioContextRef.current.close().catch(e => console.log(e));
+             }
+        };
+    }, []);
+>>>>>>> Gouransh
 
     const handleUserMedia = (stream) => {
         streamRef.current = stream;
