@@ -23,12 +23,6 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
         onViolationRef.current = onViolation;
     }, [onViolation]);
 
-    // Keep latest onViolation reference to prevent reset of the detection loop
-    const onViolationRef = useRef(onViolation);
-    useEffect(() => {
-        onViolationRef.current = onViolation;
-    }, [onViolation]);
-
     // Initialize TensorFlow Model
     useEffect(() => {
         const loadModel = async () => {
@@ -163,10 +157,6 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
 
         return () => {
              clearInterval(interval);
-<<<<<<< HEAD
-        };
-    }, [model, isDetecting, testId]);
-=======
         };
     }, [model, isDetecting, testId]);
 
@@ -177,7 +167,6 @@ const ProctoringMonitor = ({ testId, onViolation }) => {
              }
         };
     }, []);
->>>>>>> Gouransh
 
     const handleUserMedia = (stream) => {
         streamRef.current = stream;
