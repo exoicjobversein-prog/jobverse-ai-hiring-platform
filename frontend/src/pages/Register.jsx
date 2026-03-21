@@ -79,9 +79,10 @@ export default function Register() {
                                 <option value="STUDENT">Student / Job Seeker</option>
                                 <option value="HR">HR Professional / Recruiter</option>
                                 <option value="PROFESSIONAL">Industry Professional / Mentor</option>
+                                <option value="ALUMNI">Alumni</option>
                             </select>
                         </div>
-                        {(form.role === 'HR' || form.role === 'PROFESSIONAL') && (
+                        {(form.role === 'HR' || form.role === 'PROFESSIONAL' || form.role === 'ALUMNI') && (
                             <div>
                                 <label>Company / Organization</label>
                                 <input className="input-field" value={form.company_name} onChange={e => setForm({ ...form, company_name: e.target.value })} placeholder="TechCorp Ltd." />

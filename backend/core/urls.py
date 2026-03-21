@@ -11,5 +11,6 @@ urlpatterns = [
     path('api/resumes/', include('apps.resumes.urls')),
     path('api/interviews/', include('apps.interviews.urls')),
     path('api/community/', include('apps.workshops.urls')),
+    path('api/chat/', include('apps.community.urls')),
     path('api/users/delete/', DeleteAccountView.as_view(), name='delete_account'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

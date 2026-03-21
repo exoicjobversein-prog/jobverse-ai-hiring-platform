@@ -3,7 +3,7 @@ import { useState } from 'react';
 import {
     LayoutDashboard, User, FileText, Briefcase, Bot, Brain, BarChart3,
     MessageSquare, CalendarDays, ClipboardList, Settings, LogOut,
-    PanelLeftClose, PanelLeftOpen, ChevronRight, Plus, Users, TrendingUp
+    PanelLeftClose, PanelLeftOpen, ChevronRight, Plus, Users, TrendingUp, Bell
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -29,12 +29,24 @@ const hrNav = [
     { to: '/hr/analytics', icon: TrendingUp, label: 'Analytics' },
 ];
 
+const alumniNav = [
+    { to: '/alumni/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/alumni/profile', icon: User, label: 'Profile' },
+    { to: '/alumni/requests', icon: Users, label: 'Student Requests' },
+    { to: '/alumni/community', icon: MessageSquare, label: 'Community Chat' },
+    { to: '/alumni/jobs', icon: Briefcase, label: 'Job Referrals' },
+    { to: '/alumni/jobs/new', icon: Plus, label: 'Post Opportunity' },
+    { to: '/alumni/messages', icon: MessageSquare, label: 'Messages' },
+    { to: '/alumni/notifications', icon: Bell, label: 'Notifications' },
+    { to: '/alumni/settings', icon: Settings, label: 'Settings' },
+];
+
 export default function DashboardLayout({ user, setUser, role }) {
     const [collapsed, setCollapsed] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
-    const nav = role === 'HR' ? hrNav : studentNav;
+    const nav = role === 'HR' ? hrNav : role === 'ALUMNI' ? alumniNav : studentNav;
 
     const handleLogout = () => {
         localStorage.removeItem('access_token');
@@ -75,7 +87,7 @@ export default function DashboardLayout({ user, setUser, role }) {
                             </div>
                             <div className="overflow-hidden">
                                 <p className="text-white font-semibold text-sm truncate">{user.first_name || user.username}</p>
-                                <span className={`badge text-xs ${role === 'HR' ? 'badge-amber' : 'badge-indigo'}`}>{role}</span>
+                                <span className={`badge text-xs ${role === 'HR' ? 'badge-amber' : role === 'ALUMNI' ? 'badge-emerald' : 'badge-indigo'}`}>{role}</span>
                             </div>
                         </div>
                     </div>

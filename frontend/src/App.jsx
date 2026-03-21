@@ -26,6 +26,16 @@ import MyJobs from './pages/hr/MyJobs';
 import HRApplications from './pages/hr/Applications';
 import HRAnalytics from './pages/hr/Analytics';
 
+// Alumni pages
+import AlumniDashboard from './pages/alumni/Dashboard';
+import AlumniProfile from './pages/alumni/Profile';
+import StudentRequests from './pages/alumni/StudentRequests';
+import JobReferrals from './pages/alumni/JobReferrals';
+import AlumniMessages from './pages/alumni/Messages';
+import Notifications from './pages/alumni/Notifications';
+import Settings from './pages/alumni/Settings';
+import PostReferral from './pages/alumni/PostJob';
+
 // Interview session
 import InterviewSession from './pages/InterviewSession';
 import InterviewWarning from './pages/InterviewWarning';
@@ -74,7 +84,7 @@ export default function App() {
                 {/* Public */}
                 <Route path="/login" element={<Login setUser={updateUser} />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/" element={user ? <Navigate to={user.role === 'HR' ? '/hr/dashboard' : '/student/dashboard'} /> : <Navigate to="/login" />} />
+                <Route path="/" element={user ? <Navigate to={user.role === 'HR' ? '/hr/dashboard' : user.role === 'ALUMNI' ? '/alumni/dashboard' : '/student/dashboard'} /> : <Navigate to="/login" />} />
 
                 {/* Student Routes */}
                 <Route path="/student" element={
@@ -110,6 +120,24 @@ export default function App() {
                     <Route path="jobs/new" element={<PostJob user={user} />} />
                     <Route path="applications" element={<HRApplications user={user} />} />
                     <Route path="analytics" element={<HRAnalytics user={user} />} />
+                </Route>
+
+                {/* Alumni Routes */}
+                <Route path="/alumni" element={
+                    <ProtectedRoute user={user} allowedRoles={['ALUMNI', 'ADMIN']}>
+                        <DashboardLayout user={user} setUser={updateUser} role="ALUMNI" />
+                    </ProtectedRoute>
+                }>
+                    <Route index element={<Navigate to="dashboard" />} />
+                    <Route path="dashboard" element={<AlumniDashboard user={user} />} />
+                    <Route path="profile" element={<AlumniProfile user={user} setUser={updateUser} />} />
+                    <Route path="requests" element={<StudentRequests user={user} />} />
+                    <Route path="community" element={<CommunityChat user={user} />} />
+                    <Route path="jobs" element={<JobReferrals user={user} />} />
+                    <Route path="jobs/new" element={<PostReferral user={user} />} />
+                    <Route path="messages" element={<AlumniMessages user={user} />} />
+                    <Route path="notifications" element={<Notifications user={user} />} />
+                    <Route path="settings" element={<Settings user={user} setUser={updateUser} />} />
                 </Route>
             </Routes>
         </Router>

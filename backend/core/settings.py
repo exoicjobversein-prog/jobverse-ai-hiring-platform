@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'apps.interviews.apps.InterviewsConfig',
     'apps.proctoring.apps.ProctoringConfig',
     'apps.workshops.apps.WorkshopsConfig',
+    'apps.community.apps.CommunityConfig',
 ]
 
 MEDIA_URL = '/media/'
@@ -183,11 +184,23 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_TASK_ALWAYS_EAGER = True  # Bypass Redis
 
 # Channels Configuration
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer"
+_REDIS_URL = os.getenv('REDIS_URL')
+if _REDIS_URL:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [_REDIS_URL],
+            },
+        }
     }
-}
+else:
+    # Fallback for local dev without Redis
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer"
+        }
+    }
 
 # Email Backend for SMTP
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

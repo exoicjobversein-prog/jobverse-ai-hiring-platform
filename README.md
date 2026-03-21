@@ -14,11 +14,14 @@
 | 🎙️ Practice Interviews | AI-driven mock interviews for student preparation |
 | 📋 HR Job Management | Post, edit, delete jobs and manage all applicants |
 | 📊 Analytics Dashboards | Score trends, domain breakdowns, and hiring insights |
-| 💬 Community Chat | Real-time peer chat for students |
-| 🔒 Advanced AI Proctoring | Webcam object API (Phones/Multiple Faces), Audio Noise & Hardware tampering logs |
+| 💬 Community Chat | Real-time peer chat with WebRTC Video & Voice calls for DMs |
+| 🎓 Alumni Connect | Mentorship, job referrals, and direct student requests via Alumni Dashboard |
+| 🕹️ Multiplayer Game | Real-time matchmaking Tic-Tac-Toe via WebSocket for community engagement |
+| 🔒 Advanced AI Proctoring | Webcam object detection (Phones/Multiple Faces), Audio Noise & Hardware tampering logs |
 | 🛡️ Anti-Cheat Mechanisms | Tab-switches, Fullscreen-exits, Copy-Paste blocks, and Screenshot warnings |
 | 📧 Email Automation | SMTP notifications for scheduling, acceptance, and results |
 | 🏋️ Workshops | Student workshop discovery and enrollment |
+| ☁️ Cloud Media Storage | Resume and media files stored via Cloudinary |
 
 ---
 
@@ -62,8 +65,15 @@ Register/Login → Student Dashboard
    │      AI mock interview on any topic
    │      Async Gemini evaluation after each answer
    │
-   ├── 💬 Community Chat
+   ├── 💬 Community Chat & Connect
    │      Real-time peer discussion with other students
+   │      Direct Messages with Alumni and Peers
+   │      Seamless WebRTC Voice & Video calling built-in
+   │      Mute / Camera toggle controls during calls
+   │
+   ├── 🕹️ Multiplayer Game
+   │      Real-time online Tic-Tac-Toe against other students
+   │      WebSocket-based matchmaking queue
    │
    └── 🏋️ Workshops
           Browse & join skill workshops
@@ -93,6 +103,29 @@ Register/Login (role: HR) → HR Dashboard
           Hiring pipeline stats, score distributions, domain performance
 ```
 
+### 🎓 Alumni Flow
+
+```
+Register/Login (role: Alumni) → Alumni Dashboard
+   │
+   ├── 👤 Profile Management
+   │      Update bio, company, role, and professional details
+   │
+   ├── 📬 Student Requests
+   │      Review mentorship / referral requests from students
+   │      Accept or decline with a response message
+   │
+   ├── 💼 Job Referrals
+   │      Post and manage job referral opportunities for students
+   │
+   ├── 💬 Community Chat & Direct Messages
+   │      Engage in community channels
+   │      One-on-one DMs with students; WebRTC Video & Voice calls
+   │
+   └── 🔔 Notifications & Settings
+          Manage preferences and notification alerts
+```
+
 ---
 
 ## 🏗️ Architecture
@@ -103,11 +136,12 @@ Register/Login (role: HR) → HR Dashboard
 backend/
 ├── core/                  # Django settings, URL root, ASGI/WSGI
 ├── apps/
-│   ├── users/             # Custom user model (Student / HR roles), JWT auth
+│   ├── users/             # Custom user model (Student / Alumni / HR roles), JWT auth
 │   ├── jobs/              # Job postings, Applications, Resume AI screening
-│   ├── resumes/           # Resume storage and AI summary generation
+│   ├── resumes/           # Resume storage, PDF parsing, AI summary generation
 │   ├── interviews/        # AI Interviews, Practice Interviews, Aptitude Tests
-│   ├── proctoring/        # Violation logs (tab switch, copy-paste, etc.)
+│   ├── proctoring/        # Violation logs (webcam, audio, tab-switch, etc.)
+│   ├── community/         # Real-time chat, DMs, WebRTC signaling, matchmaking game
 │   └── workshops/         # Workshop model and enrollment
 ├── services/
 │   └── ai_service.py      # All Gemini API calls (questions, evaluation, reports)
@@ -116,11 +150,13 @@ backend/
 
 | Layer | Technology |
 |---|---|
-| Framework | Django 4 + Django REST Framework |
+| Framework | Django 5 + Django REST Framework |
 | Auth | JWT (Simple JWT) |
 | AI Engine | Google Gemini 1.5 Flash (via `google-generativeai`) |
+| WebSockets | Django Channels + Daphne (ASGI) |
 | Task Queue | Celery + Redis |
 | Database | PostgreSQL (Neon / local) |
+| Media Storage | Cloudinary |
 | Email | SMTP (Gmail) |
 
 ### Frontend — React + Vite
@@ -132,6 +168,8 @@ frontend/src/
 │   ├── StudentDashboard.jsx        # Main layout for students
 │   ├── HRDashboard.jsx             # Main layout for HR
 │   ├── InterviewSession.jsx        # Live AI interview UI
+│   ├── InterviewWarning.jsx        # Pre-interview rules screen
+│   ├── JobListing.jsx              # Public job listing
 │   ├── hr/
 │   │   ├── Dashboard.jsx           # HR overview
 │   │   ├── PostJob.jsx             # Job creation form
@@ -139,16 +177,25 @@ frontend/src/
 │   │   ├── Applications.jsx        # Candidate management
 │   │   ├── Analytics.jsx           # HR analytics charts
 │   │   └── Profile.jsx
-│   └── student/
-│       ├── Dashboard.jsx           # Student overview + interview invite
-│       ├── JobMarketplace.jsx      # Job search and apply
-│       ├── AptitudePractice.jsx    # Proctored aptitude test
-│       ├── PracticeInterview.jsx   # AI mock interview
-│       ├── Resumes.jsx             # Resume builder
-│       ├── CommunityChat.jsx       # Peer chat
-│       ├── Workshops.jsx
-│       ├── Analytics.jsx
-│       └── Profile.jsx
+│   ├── student/
+│   │   ├── Dashboard.jsx           # Student overview + interview invite
+│   │   ├── JobMarketplace.jsx      # Job search and apply
+│   │   ├── AptitudePractice.jsx    # Proctored aptitude test (TensorFlow AI)
+│   │   ├── PracticeInterview.jsx   # AI mock interview
+│   │   ├── Resumes.jsx             # Resume builder & upload
+│   │   ├── CommunityChat.jsx       # Peer chat + WebRTC Video/Voice calls
+│   │   ├── Workshops.jsx
+│   │   ├── Analytics.jsx
+│   │   ├── Applications.jsx        # Student's own applications
+│   │   └── Profile.jsx
+│   └── alumni/
+│       ├── Dashboard.jsx           # Alumni overview
+│       ├── Profile.jsx             # Alumni profile management
+│       ├── StudentRequests.jsx     # Mentorship / referral requests
+│       ├── JobReferrals.jsx        # Post and manage job referrals
+│       ├── Messages.jsx            # Direct messages + video calls
+│       ├── Notifications.jsx       # Notification feed
+│       └── Settings.jsx
 ├── services/
 │   └── api.js                      # Axios instance with JWT interceptors
 └── App.jsx                         # Route definitions
@@ -156,11 +203,14 @@ frontend/src/
 
 | Layer | Technology |
 |---|---|
-| Build Tool | Vite |
-| UI Framework | React 18 + React Router DOM |
+| Build Tool | Vite 5 |
+| UI Framework | React 18 + React Router DOM 6 |
 | Styling | Tailwind CSS + Lucide Icons |
+| Charts | Recharts |
 | API Client | Axios |
 | Notifications | React Hot Toast |
+| AI Proctoring | TensorFlow.js + COCO-SSD object detection |
+| Webcam | react-webcam |
 
 ---
 
@@ -169,7 +219,7 @@ frontend/src/
 ### Prerequisites
 - Python 3.10+
 - Node.js 18+
-- Redis (for Celery task queue)
+- Redis (for Celery + Django Channels)
 - PostgreSQL (or SQLite for quick dev)
 
 ---
@@ -204,8 +254,14 @@ EMAIL_HOST_USER=your_email@gmail.com
 EMAIL_HOST_PASSWORD=your_gmail_app_password
 DEFAULT_FROM_EMAIL=your_email@gmail.com
 
-# Redis (for Celery)
+# Redis (for Celery + Channels)
 CELERY_BROKER_URL=redis://localhost:6379/0
+CHANNEL_LAYERS_REDIS=redis://localhost:6379/1
+
+# Cloudinary (Media Storage)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
 ```
 
 ---
@@ -224,13 +280,13 @@ python -m venv venv
 pip install -r requirements.txt
 
 # Apply database migrations
-.\venv\Scripts\python.exe manage.py migrate
+python manage.py migrate
 
 # (Optional) Load sample aptitude questions
-.\venv\Scripts\python.exe manage.py loaddata fixtures/aptitude_questions.json
+python manage.py loaddata fixtures/aptitude_questions.json
 
-# Start the Django development server
-.\venv\Scripts\python.exe manage.py runserver
+# Start the Django/Daphne ASGI server
+python manage.py runserver
 ```
 
 Backend runs at: **http://localhost:8000**
@@ -264,7 +320,7 @@ celery -A core worker -l info --pool=solo   # Windows
 # celery -A core worker -l info             # Mac/Linux
 ```
 
-> **Note:** Redis must be running before starting Celery. Install Redis locally or use a cloud Redis instance.
+> **Note:** Redis must be running before starting Celery and Django Channels. Install Redis locally or use a cloud Redis instance.
 
 ---
 
@@ -272,10 +328,11 @@ celery -A core worker -l info --pool=solo   # Windows
 
 | Role | Access |
 |---|---|
-| **Student** | Job marketplace, resume builder, aptitude tests, practice interviews, AI interview session, community chat, workshops |
+| **Student** | Job marketplace, resume builder, aptitude tests, practice interviews, AI interviews, community chat, video/voice calls, multiplayer game, workshops |
+| **Alumni** | Alumni dashboard, review student requests, provide job referrals, connect via community chat and video calls |
 | **HR** | Post/edit/delete jobs, view & manage applications, schedule AI interviews, view results and analytics |
 
-Register with any email — select your role (Student / HR) during registration.
+Register with any email — select your role (Student / Alumni / HR) during registration.
 
 ---
 
@@ -283,7 +340,7 @@ Register with any email — select your role (Student / HR) during registration.
 
 The Full Readiness Test and category-specific tests operate under a strict, automated AI proctoring environment:
 
-### AI Detection Engine (TensorFlow `coco-ssd`)
+### AI Detection Engine (TensorFlow.js `coco-ssd`)
 - **Object Detection:** Continuously scans the webcam feed. If a **Cell Phone** or **Multiple Persons** are detected, the test triggers a 'Severe' violation and auto-submits.
 - **Face Tracking:** Triggers a warning if the candidate's face drops out of frame for 10 seconds. Accumulating 5 "No Face" strikes auto-submits the test.
 
@@ -307,7 +364,7 @@ The Full Readiness Test and category-specific tests operate under a strict, auto
 
 ```
 JobVerse-AI/
-├── backend/          # Django + DRF API server
+├── backend/          # Django + DRF + Channels API server
 ├── frontend/         # React + Vite web app
 ├── docker-compose.yml
 ├── .env              # Root-level env (if using Docker)
@@ -332,7 +389,8 @@ docker-compose up --build
 - `venv/`, `.env`, and `node_modules/` are all git-ignored — see `.gitignore`.
 - Always activate your Python virtual environment before running backend commands.
 - The Celery worker **must** be running for any AI feature to work (resume screening, interview generation, aptitude evaluation).
-- Media files (uploaded resumes) are stored in `backend/media/resumes/`.
+- Django Channels / Daphne handles all WebSocket connections (community chat, video call signaling, game matchmaking).
+- Media files (uploaded resumes) are stored via Cloudinary.
 
 ---
 
