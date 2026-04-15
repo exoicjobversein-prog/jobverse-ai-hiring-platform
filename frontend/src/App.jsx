@@ -36,6 +36,10 @@ import Notifications from './pages/alumni/Notifications';
 import Settings from './pages/alumni/Settings';
 import PostReferral from './pages/alumni/PostJob';
 
+// Placement Admin pages
+import PlacementDashboard from './pages/placement/Dashboard';
+import PlacementPendingVerification from './pages/placement/PendingVerification';
+
 // Interview session
 import InterviewSession from './pages/InterviewSession';
 import InterviewWarning from './pages/InterviewWarning';
@@ -46,6 +50,14 @@ import DashboardLayout from './components/DashboardLayout';
 const ProtectedRoute = ({ user, allowedRoles, children }) => {
     if (!user) return <Navigate to="/login" replace />;
     if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/login" replace />;
+    return children;
+};
+
+// Placement Admin route guard — also checks is_verified
+const PlacementRoute = ({ user, children }) => {
+    if (!user) return <Navigate to="/login" replace />;
+    if (user.role !== 'PLACEMENT_ADMIN') return <Navigate to="/login" replace />;
+    if (!user.is_verified) return <Navigate to="/placement/pending" replace />;
     return children;
 };
 
@@ -84,7 +96,13 @@ export default function App() {
                 {/* Public */}
                 <Route path="/login" element={<Login setUser={updateUser} />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/" element={user ? <Navigate to={user.role === 'HR' ? '/hr/dashboard' : user.role === 'ALUMNI' ? '/alumni/dashboard' : '/student/dashboard'} /> : <Navigate to="/login" />} />
+                <Route path="/" element={user ? <Navigate to={
+                    user.role === 'HR' ? '/hr/dashboard'
+                    : user.role === 'ALUMNI' ? '/alumni/dashboard'
+                    : user.role === 'PLACEMENT_ADMIN'
+                        ? (user.is_verified ? '/placement/dashboard' : '/placement/pending')
+                    : '/student/dashboard'
+                } /> : <Navigate to="/login" />} />
 
                 {/* Student Routes */}
                 <Route path="/student" element={
@@ -138,6 +156,24 @@ export default function App() {
                     <Route path="messages" element={<AlumniMessages user={user} />} />
                     <Route path="notifications" element={<Notifications user={user} />} />
                     <Route path="settings" element={<Settings user={user} setUser={updateUser} />} />
+                </Route>
+
+                {/* Placement Admin Routes */}
+                {/* Pending page — accessible by any authenticated PLACEMENT_ADMIN (even unverified) */}
+                <Route path="/placement/pending" element={
+                    user?.role === 'PLACEMENT_ADMIN'
+                        ? <PlacementPendingVerification />
+                        : <Navigate to="/login" replace />
+                } />
+
+                {/* Protected placement dashboard — only verified PLACEMENT_ADMIN */}
+                <Route path="/placement" element={
+                    <PlacementRoute user={user}>
+                        <DashboardLayout user={user} setUser={updateUser} role="PLACEMENT_ADMIN" />
+                    </PlacementRoute>
+                }>
+                    <Route index element={<Navigate to="dashboard" />} />
+                    <Route path="dashboard" element={<PlacementDashboard user={user} />} />
                 </Route>
             </Routes>
         </Router>

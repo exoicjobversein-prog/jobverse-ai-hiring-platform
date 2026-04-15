@@ -3,7 +3,8 @@ import { useState } from 'react';
 import {
     LayoutDashboard, User, FileText, Briefcase, Bot, Brain, BarChart3,
     MessageSquare, CalendarDays, ClipboardList, Settings, LogOut,
-    PanelLeftClose, PanelLeftOpen, ChevronRight, Plus, Users, TrendingUp, Bell
+    PanelLeftClose, PanelLeftOpen, ChevronRight, Plus, Users, TrendingUp, Bell,
+    Building2, ShieldCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -41,12 +42,19 @@ const alumniNav = [
     { to: '/alumni/settings', icon: Settings, label: 'Settings' },
 ];
 
+const placementNav = [
+    { to: '/placement/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/placement/jobs/new', icon: Plus, label: 'Post a Job' },
+    { to: '/placement/students', icon: Users, label: 'Student Profiles' },
+    { to: '/placement/shortlist', icon: ClipboardList, label: 'Shortlist' },
+];
+
 export default function DashboardLayout({ user, setUser, role }) {
     const [collapsed, setCollapsed] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
-    const nav = role === 'HR' ? hrNav : role === 'ALUMNI' ? alumniNav : studentNav;
+    const nav = role === 'HR' ? hrNav : role === 'ALUMNI' ? alumniNav : role === 'PLACEMENT_ADMIN' ? placementNav : studentNav;
 
     const handleLogout = () => {
         localStorage.removeItem('access_token');
@@ -87,7 +95,7 @@ export default function DashboardLayout({ user, setUser, role }) {
                             </div>
                             <div className="overflow-hidden">
                                 <p className="text-white font-semibold text-sm truncate">{user.first_name || user.username}</p>
-                                <span className={`badge text-xs ${role === 'HR' ? 'badge-amber' : role === 'ALUMNI' ? 'badge-emerald' : 'badge-indigo'}`}>{role}</span>
+                                <span className={`badge text-xs ${role === 'HR' ? 'badge-amber' : role === 'ALUMNI' ? 'badge-emerald' : role === 'PLACEMENT_ADMIN' ? 'badge-slate' : 'badge-indigo'}`}>{role === 'PLACEMENT_ADMIN' ? 'Placement Admin' : role}</span>
                             </div>
                         </div>
                     </div>

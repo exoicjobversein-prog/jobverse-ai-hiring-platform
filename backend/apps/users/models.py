@@ -8,10 +8,17 @@ class User(AbstractUser):
         ('PROFESSIONAL', 'Professional'),
         ('ALUMNI', 'Alumni'),
         ('ADMIN', 'Admin'),
+        ('PLACEMENT_ADMIN', 'Placement Admin'),
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='STUDENT')
     company_name = models.CharField(max_length=255, blank=True, null=True, help_text="Relevant for HR and Professional role")
-    
+
+    # Verification flag — Placement Admins start as unverified
+    is_verified = models.BooleanField(
+        default=True,
+        help_text="Set to False for PLACEMENT_ADMIN until manually verified by staff"
+    )
+
     # Professional Profile Fields
     profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
     headline = models.CharField(max_length=255, blank=True, null=True)
@@ -24,6 +31,53 @@ class User(AbstractUser):
     linkedin_url = models.URLField(blank=True, null=True)
     github_url = models.URLField(blank=True, null=True)
     designation = models.CharField(max_length=255, blank=True, null=True, help_text="Relevant for Professional role")
-    
+
     def __str__(self):
         return f"{self.username} - {self.role}"
+
+
+class PlacementProfile(models.Model):
+    VERIFICATION_STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('VERIFIED', 'Verified'),
+        ('REJECTED', 'Rejected'),
+    )
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='placement_profile'
+    )
+
+    # College Information
+    college_name = models.CharField(max_length=255)
+    college_email = models.EmailField(help_text="Must be an institutional email (.edu / .ac.in)")
+    college_location = models.CharField(max_length=255, blank=True, null=True, help_text="City, State")
+    university_affiliation = models.CharField(max_length=255, blank=True, null=True)
+
+    # Placement Officer Details
+    officer_full_name = models.CharField(max_length=255)
+    officer_designation = models.CharField(
+        max_length=255, blank=True, null=True,
+        help_text="e.g. Training & Placement Officer"
+    )
+    officer_contact = models.CharField(max_length=20)
+
+    # Verification
+    proof_document = models.FileField(
+        upload_to='placement_proofs/',
+        help_text="ID Card / Appointment Letter / Authorization Letter"
+    )
+    verification_status = models.CharField(
+        max_length=20,
+        choices=VERIFICATION_STATUS_CHOICES,
+        default='PENDING'
+    )
+    verified_at = models.DateTimeField(blank=True, null=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.college_name} — {self.user.username} ({self.verification_status})"

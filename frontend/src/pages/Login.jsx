@@ -22,7 +22,12 @@ export default function Login({ setUser }) {
             localStorage.setItem('user', JSON.stringify(user));
             setUser(user);
             toast.success(`Welcome back, ${user.first_name || user.username}!`);
-            navigate(user.role === 'HR' ? '/hr/dashboard' : user.role === 'ALUMNI' ? '/alumni/dashboard' : '/student/dashboard');
+            if (user.role === 'HR') navigate('/hr/dashboard');
+            else if (user.role === 'ALUMNI') navigate('/alumni/dashboard');
+            else if (user.role === 'PLACEMENT_ADMIN') {
+                navigate(user.is_verified ? '/placement/dashboard' : '/placement/pending');
+            }
+            else navigate('/student/dashboard');
         } catch (err) {
             const msg = err.response?.data?.detail || 'Invalid credentials.';
             toast.error(msg);
