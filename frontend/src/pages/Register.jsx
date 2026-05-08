@@ -9,7 +9,7 @@ const PLACEMENT_ROLE = 'PLACEMENT_ADMIN';
 export default function Register() {
     const [form, setForm] = useState({
         username: '', email: '', password: '', role: 'STUDENT',
-        company_name: '', first_name: '', last_name: '',
+        company_name: '', college_name: '', first_name: '', last_name: '',
     });
     const [placement, setPlacement] = useState({
         college_name: '', college_email: '', college_location: '',
@@ -35,12 +35,7 @@ export default function Register() {
                 setLoading(false);
                 return;
             }
-            const collegeEmailDomain = placement.college_email.split('@')[1]?.toLowerCase() || '';
-            if (!collegeEmailDomain.endsWith('.ac.in') && !collegeEmailDomain.endsWith('.edu') && !collegeEmailDomain.endsWith('.edu.in')) {
-                toast.error('College email must be from an institutional domain (.ac.in or .edu).');
-                setLoading(false);
-                return;
-            }
+
         }
 
         try {
@@ -144,6 +139,27 @@ export default function Register() {
                                 <option value={PLACEMENT_ROLE}>Placement Department / College Admin</option>
                             </select>
                         </div>
+                        
+                        {/* Conditional field for Student */}
+                        {form.role === 'STUDENT' && (
+                            <div>
+                                <label>College / University</label>
+                                <select className="select-field" value={form.college_name} onChange={e => setForm({ ...form, college_name: e.target.value })}>
+                                    <option value="">Select your college</option>
+                                    <option value="Indian Institute of Management (IIM) Indore">Indian Institute of Management (IIM) Indore</option>
+                                    <option value="Indian Institute of Technology (IIT) Indore">Indian Institute of Technology (IIT) Indore</option>
+                                    <option value="Shri Govindram Seksaria Institute of Technology and Science (SGSITS)">Shri Govindram Seksaria Institute of Technology and Science (SGSITS)</option>
+                                    <option value="Devi Ahilya Vishwavidyalaya (DAVV)">Devi Ahilya Vishwavidyalaya (DAVV)</option>
+                                    <option value="Holkar Science College">Holkar Science College</option>
+                                    <option value="Mahatma Gandhi Memorial Medical College (MGM)">Mahatma Gandhi Memorial Medical College (MGM)</option>
+                                    <option value="Institute of Engineering and Technology (IET DAVV)">Institute of Engineering and Technology (IET DAVV)</option>
+                                    <option value="Prestige Institute of Engineering Management and Research (PIEMR)">Prestige Institute of Engineering Management and Research (PIEMR)</option>
+                                    <option value="Indore Institute of Law">Indore Institute of Law</option>
+                                    <option value="Acropolis Institute of Technology and Research">Acropolis Institute of Technology and Research</option>
+                                </select>
+                            </div>
+                        )}
+
                         {(form.role === 'HR' || form.role === 'PROFESSIONAL' || form.role === 'ALUMNI') && (
                             <div>
                                 <label>Company / Organization</label>
@@ -171,30 +187,19 @@ export default function Register() {
                                     <div className="space-y-3">
                                         <div>
                                             <label>College Name <span className="text-red-400">*</span></label>
-                                            <input className="input-field" value={placement.college_name}
-                                                onChange={e => setPlacement({ ...placement, college_name: e.target.value })}
-                                                placeholder="e.g. MIT College of Engineering" required={isPlacement} />
-                                        </div>
-                                        <div>
-                                            <label>
-                                                Official College Email <span className="text-red-400">*</span>
-                                                <span className="text-slate-500 ml-1 font-normal">(.ac.in / .edu)</span>
-                                            </label>
-                                            <input className="input-field" type="email" value={placement.college_email}
-                                                onChange={e => setPlacement({ ...placement, college_email: e.target.value })}
-                                                placeholder="placement@college.ac.in" required={isPlacement} />
-                                        </div>
-                                        <div>
-                                            <label>College Location <span className="text-slate-500 font-normal">(City, State)</span></label>
-                                            <input className="input-field" value={placement.college_location}
-                                                onChange={e => setPlacement({ ...placement, college_location: e.target.value })}
-                                                placeholder="Pune, Maharashtra" />
-                                        </div>
-                                        <div>
-                                            <label>University / Affiliation <span className="text-slate-500 font-normal">(optional)</span></label>
-                                            <input className="input-field" value={placement.university_affiliation}
-                                                onChange={e => setPlacement({ ...placement, university_affiliation: e.target.value })}
-                                                placeholder="Savitribai Phule Pune University" />
+                                            <select className="select-field" value={placement.college_name} onChange={e => setPlacement({ ...placement, college_name: e.target.value })} required={isPlacement}>
+                                                <option value="">Select your college</option>
+                                                <option value="Indian Institute of Management (IIM) Indore">Indian Institute of Management (IIM) Indore</option>
+                                                <option value="Indian Institute of Technology (IIT) Indore">Indian Institute of Technology (IIT) Indore</option>
+                                                <option value="Shri Govindram Seksaria Institute of Technology and Science (SGSITS)">Shri Govindram Seksaria Institute of Technology and Science (SGSITS)</option>
+                                                <option value="Devi Ahilya Vishwavidyalaya (DAVV)">Devi Ahilya Vishwavidyalaya (DAVV)</option>
+                                                <option value="Holkar Science College">Holkar Science College</option>
+                                                <option value="Mahatma Gandhi Memorial Medical College (MGM)">Mahatma Gandhi Memorial Medical College (MGM)</option>
+                                                <option value="Institute of Engineering and Technology (IET DAVV)">Institute of Engineering and Technology (IET DAVV)</option>
+                                                <option value="Prestige Institute of Engineering Management and Research (PIEMR)">Prestige Institute of Engineering Management and Research (PIEMR)</option>
+                                                <option value="Indore Institute of Law">Indore Institute of Law</option>
+                                                <option value="Acropolis Institute of Technology and Research">Acropolis Institute of Technology and Research</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -206,12 +211,7 @@ export default function Register() {
                                         <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Placement Officer Details</span>
                                     </div>
                                     <div className="space-y-3">
-                                        <div>
-                                            <label>Full Name <span className="text-red-400">*</span></label>
-                                            <input className="input-field" value={placement.officer_full_name}
-                                                onChange={e => setPlacement({ ...placement, officer_full_name: e.target.value })}
-                                                placeholder="Dr. Ramesh Kumar" required={isPlacement} />
-                                        </div>
+
                                         <div>
                                             <label>Designation <span className="text-slate-500 font-normal">(optional)</span></label>
                                             <input className="input-field" value={placement.officer_designation}

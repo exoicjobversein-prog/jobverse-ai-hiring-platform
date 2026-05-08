@@ -111,6 +111,12 @@ export default function StudentProfile({ user, setUser }) {
                                 ? <input className="input-field" value={profile.location || ''} onChange={set('location')} placeholder="Bangalore, India" />
                                 : <p className="text-slate-300 text-sm mt-1">{profile.location || <span className="text-slate-500 italic">Not set</span>}</p>}
                         </div>
+                        <div className="col-span-2">
+                            <label>College / University</label>
+                            {editing
+                                ? <input className="input-field" value={profile.college_name || ''} onChange={set('college_name')} placeholder="Your College Name" />
+                                : <p className="text-slate-300 text-sm mt-1">{profile.college_name || <span className="text-slate-500 italic">Not set</span>}</p>}
+                        </div>
                     </div>
                 </div>
 

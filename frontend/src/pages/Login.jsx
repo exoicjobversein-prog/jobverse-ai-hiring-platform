@@ -25,7 +25,7 @@ export default function Login({ setUser }) {
             if (user.role === 'HR') navigate('/hr/dashboard');
             else if (user.role === 'ALUMNI') navigate('/alumni/dashboard');
             else if (user.role === 'PLACEMENT_ADMIN') {
-                navigate(user.is_verified ? '/placement/dashboard' : '/placement/pending');
+                navigate('/placement/dashboard');
             }
             else navigate('/student/dashboard');
         } catch (err) {

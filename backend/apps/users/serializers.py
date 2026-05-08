@@ -23,7 +23,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'id', 'username', 'email', 'first_name', 'last_name',
-            'role', 'company_name', 'profile_photo', 'profile_photo_url',
+            'role', 'company_name', 'college_name', 'profile_photo', 'profile_photo_url',
             'headline', 'location', 'years_of_experience', 'skills',
             'education', 'certifications', 'projects',
             'linkedin_url', 'github_url', 'designation', 'is_verified'
@@ -90,8 +90,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             # Required placement fields
             required = {
                 'college_name': 'College name is required.',
-                'college_email': 'Official college email is required.',
-                'officer_full_name': 'Officer full name is required.',
                 'officer_contact': 'Officer contact number is required.',
                 'proof_document': 'Proof document upload is required.',
             }
@@ -99,16 +97,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                 if not data.get(field):
                     raise serializers.ValidationError({field: msg})
 
-            # Validate college email domain
-            college_email = data.get('college_email', '')
-            domain = college_email.split('@')[-1].lower() if '@' in college_email else ''
-            if not any(domain.endswith(suf) for suf in INSTITUTIONAL_SUFFIXES):
-                raise serializers.ValidationError({
-                    'college_email': (
-                        'College email must be from an institutional domain '
-                        '(e.g. @college.ac.in or @university.edu).'
-                    )
-                })
+
 
             # Reject personal email for the account email
             account_email = data.get('email', '')
@@ -149,6 +138,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             last_name=validated_data.get('last_name', ''),
             role=role,
             company_name=validated_data.get('company_name', ''),
+            college_name=placement_fields.get('college_name', ''),
             is_verified=is_verified,
         )
 
@@ -157,10 +147,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             PlacementProfile.objects.create(
                 user=user,
                 college_name=placement_fields['college_name'],
-                college_email=placement_fields['college_email'],
+                college_email=placement_fields.get('college_email') or '',
                 college_location=placement_fields.get('college_location') or '',
                 university_affiliation=placement_fields.get('university_affiliation') or '',
-                officer_full_name=placement_fields['officer_full_name'],
+                officer_full_name=placement_fields.get('officer_full_name') or '',
                 officer_designation=placement_fields.get('officer_designation') or '',
                 officer_contact=placement_fields['officer_contact'],
                 proof_document=placement_fields['proof_document'],

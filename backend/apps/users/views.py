@@ -45,6 +45,20 @@ class PlacementProfileView(generics.RetrieveAPIView):
         return {**super().get_serializer_context(), 'request': self.request}
 
 
+class CollegeStudentsListView(generics.ListAPIView):
+    """Returns a list of STUDENT role users who belong to the same college as the Placement Admin."""
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = UserSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role != 'PLACEMENT_ADMIN':
+            return User.objects.none()
+        
+        # Match students who selected the exact same college_name
+        return User.objects.filter(role='STUDENT', college_name=user.college_name)
+
+
 class DeleteAccountView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 

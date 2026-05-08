@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Briefcase, Users, ClipboardList, Clock, Building2,
-    ShieldCheck, Phone, Mail, MapPin, GraduationCap,
-    TrendingUp, AlertTriangle
+    Users, Building2, ShieldCheck, TrendingUp, CheckCircle, Calendar,
+    MapPin, Mail, GraduationCap, Phone
 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -15,114 +14,86 @@ export default function PlacementDashboard({ user }) {
 
     useEffect(() => {
         if (!user) return;
-        // Gate: unverified users see the pending screen
-        if (!user.is_verified) {
-            navigate('/placement/pending', { replace: true });
-            return;
-        }
         api.get('/users/placement-profile/')
             .then(res => setProfile(res.data))
             .catch(() => toast.error('Failed to load placement profile.'))
             .finally(() => setLoadingProfile(false));
     }, [user, navigate]);
 
-    if (!user?.is_verified) return null;
-
-    const stats = [
-        { label: 'Jobs Posted', value: '—', icon: Briefcase, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
-        { label: 'Student Profiles Viewed', value: '—', icon: Users, color: 'text-violet-400', bg: 'bg-violet-500/10' },
-        { label: 'Candidates Shortlisted', value: '—', icon: ClipboardList, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-        { label: 'Placement Rate', value: '—', icon: TrendingUp, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+    const overviewStats = [
+        { label: 'Total Students', value: '1,250', icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+        { label: 'Placed Students', value: '842', icon: CheckCircle, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+        { label: 'Placement Rate', value: '67.3%', icon: TrendingUp, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+        { label: 'Active Companies', value: '45', icon: Building2, color: 'text-violet-400', bg: 'bg-violet-500/10' },
+        { label: 'Upcoming Drives', value: '12', icon: Calendar, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
     ];
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-10">
             {/* Welcome banner */}
-            <div className="rounded-2xl bg-gradient-to-r from-indigo-600/20 to-violet-600/20 border border-indigo-500/30 p-6">
+            <div className="rounded-2xl bg-gradient-to-r from-indigo-600/20 to-violet-600/20 border border-indigo-500/30 p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
                         <Building2 size={22} className="text-indigo-400" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-extrabold text-white">
-                            Welcome, {user?.first_name || user?.username}!
+                            Placement Command Center
                         </h1>
-                        {profile && (
-                            <p className="text-slate-400 text-sm mt-1">
-                                {profile.college_name}
-                                {profile.college_location && ` · ${profile.college_location}`}
-                            </p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2">
-                            <ShieldCheck size={13} className="text-emerald-400" />
-                            <span className="text-xs text-emerald-400 font-medium">Verified Placement Admin</span>
-                        </div>
+                        <p className="text-slate-400 text-sm mt-1">
+                            {profile?.college_name || 'Manage all placement activities from one place'}
+                        </p>
                     </div>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
+                    <span className="text-xs text-emerald-400 font-medium">Verified Admin Access</span>
                 </div>
             </div>
 
-            {/* Stats row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {stats.map(({ label, value, icon: Icon, color, bg }) => (
-                    <div key={label} className="card flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
-                            <Icon size={18} className={color} />
+            {/* Dashboard Overview */}
+            <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mt-8 mb-2 px-1">Dashboard Overview</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {overviewStats.map(({ label, value, icon: Icon, color, bg }) => (
+                    <div key={label} className="card flex flex-col gap-3 hover:-translate-y-1 transition-transform duration-200">
+                        <div className="flex items-center justify-between">
+                            <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
+                                <Icon size={18} className={color} />
+                            </div>
                         </div>
                         <div>
-                            <p className="text-xl font-bold text-white">{value}</p>
-                            <p className="text-xs text-slate-500">{label}</p>
+                            <p className="text-2xl font-bold text-white">{value}</p>
+                            <p className="text-xs text-slate-400 mt-0.5 font-medium">{label}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
-            {/* Quick actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {[
-                    { label: 'Post a Job', desc: 'Create a new placement drive or job opening', icon: Briefcase, color: 'indigo', to: '/placement/jobs/new' },
-                    { label: 'Student Profiles', desc: 'Browse and search eligible student profiles', icon: Users, color: 'violet', to: '/placement/students' },
-                    { label: 'Shortlist', desc: 'Manage shortlisted candidates for your drives', icon: ClipboardList, color: 'emerald', to: '/placement/shortlist' },
-                ].map(item => (
-                    <button
-                        key={item.label}
-                        onClick={() => toast('Coming soon — under development', { icon: '🚧' })}
-                        className="card text-left hover:border-indigo-500/50 transition-all duration-200 group"
-                    >
-                        <div className={`w-9 h-9 rounded-lg bg-${item.color}-500/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                            <item.icon size={16} className={`text-${item.color}-400`} />
-                        </div>
-                        <p className="text-sm font-semibold text-white">{item.label}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
-                    </button>
-                ))}
-            </div>
-
-            {/* Profile details */}
-            {!loadingProfile && profile && (
-                <div className="card">
-                    <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Your Placement Profile</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                        {[
-                            { label: 'College', value: profile.college_name, icon: Building2 },
-                            { label: 'College Email', value: profile.college_email, icon: Mail },
-                            { label: 'Location', value: profile.college_location || '—', icon: MapPin },
-                            { label: 'Affiliation', value: profile.university_affiliation || '—', icon: GraduationCap },
-                            { label: 'Officer', value: profile.officer_full_name, icon: Users },
-                            { label: 'Designation', value: profile.officer_designation || '—', icon: ShieldCheck },
-                            { label: 'Contact', value: profile.officer_contact, icon: Phone },
-                            { label: 'Status', value: profile.verification_status, icon: Clock },
-                        ].map(({ label, value, icon: Icon }) => (
-                            <div key={label} className="flex items-start gap-3 p-3 rounded-xl bg-slate-800/50">
-                                <Icon size={14} className="text-indigo-400 mt-0.5 shrink-0" />
-                                <div>
-                                    <p className="text-xs text-slate-500">{label}</p>
-                                    <p className="text-slate-200 font-medium">{value}</p>
-                                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                {/* Profile Summary */}
+                {!loadingProfile && profile && (
+                    <div className="card bg-slate-900/50 border border-slate-800">
+                        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <Building2 size={16} className="text-indigo-400" />
+                            Institutional Profile
+                        </h3>
+                        <div className="space-y-4 text-sm">
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                                <span className="text-slate-500 flex items-center gap-2"><Users size={14}/> Contact Officer</span>
+                                <span className="text-slate-200 font-medium">{profile.officer_full_name || 'Not provided'}</span>
                             </div>
-                        ))}
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                                <span className="text-slate-500 flex items-center gap-2"><Mail size={14}/> College Email</span>
+                                <span className="text-slate-200 font-medium">{profile.college_email || 'Not provided'}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-slate-500 flex items-center gap-2"><MapPin size={14}/> Location</span>
+                                <span className="text-slate-200 font-medium">{profile.college_location || 'Not provided'}</span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }

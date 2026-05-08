@@ -4,7 +4,7 @@ import {
     LayoutDashboard, User, FileText, Briefcase, Bot, Brain, BarChart3,
     MessageSquare, CalendarDays, ClipboardList, Settings, LogOut,
     PanelLeftClose, PanelLeftOpen, ChevronRight, Plus, Users, TrendingUp, Bell,
-    Building2, ShieldCheck
+    Building2, ShieldCheck, MonitorPlay, PieChart
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -43,10 +43,13 @@ const alumniNav = [
 ];
 
 const placementNav = [
-    { to: '/placement/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/placement/jobs/new', icon: Plus, label: 'Post a Job' },
-    { to: '/placement/students', icon: Users, label: 'Student Profiles' },
-    { to: '/placement/shortlist', icon: ClipboardList, label: 'Shortlist' },
+    { to: '/placement/dashboard', icon: LayoutDashboard, label: 'Overview' },
+    { to: '/placement/students', icon: Users, label: 'Student Management' },
+    { to: '/placement/assessments', icon: MonitorPlay, label: 'Assessments' },
+    { to: '/placement/recruitment', icon: Briefcase, label: 'Recruitment' },
+    { to: '/placement/analytics', icon: PieChart, label: 'Analytics & Reports' },
+    { to: '/placement/notifications', icon: Bell, label: 'Notifications' },
+    { to: '/placement/admin', icon: Settings, label: 'Admin Controls' },
 ];
 
 export default function DashboardLayout({ user, setUser, role }) {

@@ -38,7 +38,7 @@ import PostReferral from './pages/alumni/PostJob';
 
 // Placement Admin pages
 import PlacementDashboard from './pages/placement/Dashboard';
-import PlacementPendingVerification from './pages/placement/PendingVerification';
+import StudentManagement from './pages/placement/StudentManagement';
 
 // Interview session
 import InterviewSession from './pages/InterviewSession';
@@ -53,11 +53,10 @@ const ProtectedRoute = ({ user, allowedRoles, children }) => {
     return children;
 };
 
-// Placement Admin route guard — also checks is_verified
+// Placement Admin route guard
 const PlacementRoute = ({ user, children }) => {
     if (!user) return <Navigate to="/login" replace />;
     if (user.role !== 'PLACEMENT_ADMIN') return <Navigate to="/login" replace />;
-    if (!user.is_verified) return <Navigate to="/placement/pending" replace />;
     return children;
 };
 
@@ -99,8 +98,7 @@ export default function App() {
                 <Route path="/" element={user ? <Navigate to={
                     user.role === 'HR' ? '/hr/dashboard'
                     : user.role === 'ALUMNI' ? '/alumni/dashboard'
-                    : user.role === 'PLACEMENT_ADMIN'
-                        ? (user.is_verified ? '/placement/dashboard' : '/placement/pending')
+                    : user.role === 'PLACEMENT_ADMIN' ? '/placement/dashboard'
                     : '/student/dashboard'
                 } /> : <Navigate to="/login" />} />
 
@@ -159,12 +157,6 @@ export default function App() {
                 </Route>
 
                 {/* Placement Admin Routes */}
-                {/* Pending page — accessible by any authenticated PLACEMENT_ADMIN (even unverified) */}
-                <Route path="/placement/pending" element={
-                    user?.role === 'PLACEMENT_ADMIN'
-                        ? <PlacementPendingVerification />
-                        : <Navigate to="/login" replace />
-                } />
 
                 {/* Protected placement dashboard — only verified PLACEMENT_ADMIN */}
                 <Route path="/placement" element={
@@ -174,6 +166,14 @@ export default function App() {
                 }>
                     <Route index element={<Navigate to="dashboard" />} />
                     <Route path="dashboard" element={<PlacementDashboard user={user} />} />
+                    
+                    {/* Routes for new navigation items */}
+                    <Route path="students" element={<StudentManagement />} />
+                    <Route path="assessments" element={<div className="p-8 text-center text-slate-400">Assessment Management Module (Coming Soon)</div>} />
+                    <Route path="recruitment" element={<div className="p-8 text-center text-slate-400">Recruitment Management Module (Coming Soon)</div>} />
+                    <Route path="analytics" element={<div className="p-8 text-center text-slate-400">Analytics & Reports Module (Coming Soon)</div>} />
+                    <Route path="notifications" element={<div className="p-8 text-center text-slate-400">Notifications Module (Coming Soon)</div>} />
+                    <Route path="admin" element={<div className="p-8 text-center text-slate-400">Admin Controls Module (Coming Soon)</div>} />
                 </Route>
             </Routes>
         </Router>
