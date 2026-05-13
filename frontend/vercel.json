@@ -3,6 +3,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://jobverse-ai-hiring-platform.onrender.com/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
