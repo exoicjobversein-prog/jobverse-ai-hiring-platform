@@ -140,8 +140,8 @@ export default function Register() {
                             </select>
                         </div>
                         
-                        {/* Conditional field for Student */}
-                        {form.role === 'STUDENT' && (
+                        {/* Conditional field for Student and Alumni */}
+                        {(form.role === 'STUDENT' || form.role === 'ALUMNI') && (
                             <div>
                                 <label>College / University</label>
                                 <select className="select-field" value={form.college_name} onChange={e => setForm({ ...form, college_name: e.target.value })}>

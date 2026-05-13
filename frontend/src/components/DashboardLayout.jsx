@@ -71,11 +71,11 @@ export default function DashboardLayout({ user, setUser, role }) {
     const isActive = (to) => location.pathname === to || location.pathname.startsWith(to + '/');
 
     return (
-        <div className="flex min-h-screen bg-slate-950">
+        <div className="flex min-h-screen bg-black">
             {/* Sidebar */}
-            <aside className={`dashboard-sidebar ${collapsed ? 'w-16' : 'w-64'} flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300 z-30`}>
+            <aside className={`dashboard-sidebar ${collapsed ? 'w-16' : 'w-64'} flex-shrink-0 bg-[#0a0a0a] border-r border-white/10 flex flex-col transition-all duration-300 z-30`}>
                 {/* Logo */}
-                <div className="flex items-center justify-between px-4 py-5 border-b border-slate-800">
+                <div className="flex items-center justify-between px-4 py-5 border-b border-white/10">
                     {!collapsed && (
                         <Link to="/" className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
@@ -84,14 +84,14 @@ export default function DashboardLayout({ user, setUser, role }) {
                             <span className="font-extrabold text-white text-lg leading-none">Job<span className="text-indigo-400">Verse</span></span>
                         </Link>
                     )}
-                    <button onClick={() => setCollapsed(!collapsed)} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                    <button onClick={() => setCollapsed(!collapsed)} className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors">
                         {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
                     </button>
                 </div>
 
                 {/* User pill */}
                 {!collapsed && user && (
-                    <div className="mx-3 mt-4 mb-2 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                    <div className="mx-3 mt-4 mb-2 p-3 rounded-xl bg-white/5 border border-white/10">
                         <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                                 {(user.first_name || user.username || '?')[0].toUpperCase()}
@@ -117,7 +117,7 @@ export default function DashboardLayout({ user, setUser, role }) {
                 </nav>
 
                 {/* Logout */}
-                <div className="p-3 border-t border-slate-800">
+                <div className="p-3 border-t border-white/10">
                     <button onClick={handleLogout} title="Logout"
                         className="sidebar-item w-full text-red-400 hover:text-red-300 hover:bg-red-500/10">
                         <LogOut size={18} className="flex-shrink-0" />
@@ -129,7 +129,7 @@ export default function DashboardLayout({ user, setUser, role }) {
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Top bar */}
-                <header className="h-14 bg-slate-900/70 backdrop-blur border-b border-slate-800 flex items-center px-6 gap-4 flex-shrink-0">
+                <header className="h-14 bg-black/70 backdrop-blur border-b border-white/10 flex items-center px-6 gap-4 flex-shrink-0">
                     <div className="flex-1" />
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-sm">
@@ -145,7 +145,7 @@ export default function DashboardLayout({ user, setUser, role }) {
                 </main>
 
                 {/* Footer */}
-                <footer className="border-t border-slate-800 py-4 px-6 flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                <footer className="border-t border-white/10 py-4 px-6 flex flex-wrap items-center gap-4 text-xs text-slate-500 bg-black">
                     <span>© 2026 JobVerse AI Platform</span>
                     <span className="flex-1" />
                     {['About', 'Contact', 'Privacy Policy', 'Terms'].map(t => (

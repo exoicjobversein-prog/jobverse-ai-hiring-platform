@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, TrendingUp, Brain, Layers, Activity } from 'lucide-react';
 import api from '../../services/api';
 
 export default function Analytics() {
@@ -25,72 +25,147 @@ export default function Analytics() {
 
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload?.length) return (
-            <div className="card p-3 text-sm">
-                <p className="font-semibold text-white">{label}</p>
-                <p className="text-indigo-400">{payload[0]?.name}: <span className="font-bold">{payload[0]?.value}%</span></p>
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm shadow-2xl">
+                <p className="font-bold text-white mb-1">{label}</p>
+                <p className="text-indigo-400">{payload[0]?.name}: <span className="font-extrabold text-white">{payload[0]?.value}%</span></p>
             </div>
         );
         return null;
     };
 
-    return (
-        <div>
-            <h1 className="page-title">Performance Analytics</h1>
-            <p className="page-subtitle">Track your growth over time</p>
+    const avgPractice = practiceData.length
+        ? Math.round(practiceData.reduce((a, b) => a + b.score, 0) / practiceData.length)
+        : null;
+    const avgAptitude = aptitudeData.length
+        ? Math.round(aptitudeData.reduce((a, b) => a + b.score, 0) / aptitudeData.length)
+        : null;
+    const totalSessions = practiceData.length + aptitudeData.length;
 
+    return (
+        <div className="space-y-8">
+            {/* Header */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-950 via-slate-900 to-indigo-950 border border-violet-500/20 p-7 shadow-2xl">
+                <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-violet-600/10 blur-3xl pointer-events-none" />
+                <div className="relative flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                        <Activity size={22} className="text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-white tracking-tight">Performance Analytics</h1>
+                        <p className="text-slate-400 text-sm mt-1">Track your growth across interviews and aptitude tests</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Summary Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[
+                    {
+                        label: 'Avg AI Interview Score',
+                        value: avgPractice != null ? `${avgPractice}%` : 'N/A',
+                        icon: TrendingUp,
+                        gradient: 'from-indigo-500 to-blue-600',
+                        bg: 'bg-indigo-500/10',
+                        border: 'border-indigo-500/20',
+                        text: 'text-indigo-400',
+                        sub: `${practiceData.length} sessions`
+                    },
+                    {
+                        label: 'Avg Aptitude Score',
+                        value: avgAptitude != null ? `${avgAptitude}%` : 'N/A',
+                        icon: Brain,
+                        gradient: 'from-emerald-500 to-teal-600',
+                        bg: 'bg-emerald-500/10',
+                        border: 'border-emerald-500/20',
+                        text: 'text-emerald-400',
+                        sub: `${aptitudeData.length} tests`
+                    },
+                    {
+                        label: 'Total Sessions',
+                        value: totalSessions,
+                        icon: Layers,
+                        gradient: 'from-violet-500 to-purple-600',
+                        bg: 'bg-violet-500/10',
+                        border: 'border-violet-500/20',
+                        text: 'text-violet-400',
+                        sub: 'Combined activity'
+                    },
+                ].map(({ label, value, icon: Icon, bg, border, text, sub }) => (
+                    <div key={label} className={`${bg} border ${border} rounded-2xl p-5`}>
+                        <div className={`w-10 h-10 rounded-xl ${bg} border ${border} flex items-center justify-center mb-3`}>
+                            <Icon size={18} className={text} />
+                        </div>
+                        <p className={`text-3xl font-extrabold ${text}`}>{value}</p>
+                        <p className="text-slate-200 text-sm font-semibold mt-0.5">{label}</p>
+                        <p className="text-slate-500 text-xs mt-0.5">{sub}</p>
+                    </div>
+                ))}
+            </div>
+
+            {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Practice Interviews */}
-                <div className="card">
-                    <h2 className="section-title flex items-center gap-2"><BarChart3 size={18} className="text-indigo-400" />AI Interview Scores</h2>
+                {/* AI Interview Score Line Chart */}
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                    <div className="flex items-center gap-2 mb-6">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center">
+                            <BarChart3 size={16} className="text-indigo-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-white font-bold text-sm">AI Interview Scores</h2>
+                            <p className="text-slate-500 text-xs">Your progress over time</p>
+                        </div>
+                    </div>
                     {practiceData.length === 0 ? (
-                        <div className="text-center py-10 text-slate-500 text-sm">Complete practice interviews to see your score history</div>
+                        <div className="flex flex-col items-center justify-center py-14 text-slate-600">
+                            <TrendingUp size={32} className="mb-3 opacity-40" />
+                            <p className="text-sm font-medium text-slate-500">No data yet</p>
+                            <p className="text-xs text-slate-600 mt-1">Complete practice interviews to see scores</p>
+                        </div>
                     ) : (
                         <ResponsiveContainer width="100%" height={220}>
                             <LineChart data={practiceData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                                <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                                <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Line type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={2.5} dot={{ fill: '#6366f1', r: 4 }} activeDot={{ r: 6 }} />
+                                <Line type="monotone" dataKey="score" name="Score" stroke="#6366f1" strokeWidth={2.5}
+                                    dot={{ fill: '#6366f1', r: 4, strokeWidth: 2, stroke: '#1e1b4b' }}
+                                    activeDot={{ r: 6, stroke: '#6366f1', strokeWidth: 2 }} />
                             </LineChart>
                         </ResponsiveContainer>
                     )}
                 </div>
 
-                {/* Aptitude */}
-                <div className="card">
-                    <h2 className="section-title flex items-center gap-2"><BarChart3 size={18} className="text-emerald-400" />Aptitude Test Scores</h2>
+                {/* Aptitude Bar Chart */}
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                    <div className="flex items-center gap-2 mb-6">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center">
+                            <Brain size={16} className="text-emerald-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-white font-bold text-sm">Aptitude Test Scores</h2>
+                            <p className="text-slate-500 text-xs">Performance per test</p>
+                        </div>
+                    </div>
                     {aptitudeData.length === 0 ? (
-                        <div className="text-center py-10 text-slate-500 text-sm">Complete aptitude tests to see your score history</div>
+                        <div className="flex flex-col items-center justify-center py-14 text-slate-600">
+                            <Brain size={32} className="mb-3 opacity-40" />
+                            <p className="text-sm font-medium text-slate-500">No data yet</p>
+                            <p className="text-xs text-slate-600 mt-1">Complete aptitude tests to see scores</p>
+                        </div>
                     ) : (
                         <ResponsiveContainer width="100%" height={220}>
                             <BarChart data={aptitudeData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                                <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                                <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="score" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="score" name="Score" fill="#10b981" radius={[6, 6, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     )}
                 </div>
             </div>
-
-            {/* Summary stats */}
-            {(practiceData.length > 0 || aptitudeData.length > 0) && (
-                <div className="grid grid-cols-3 gap-4 mt-6">
-                    {[
-                        { label: 'Avg AI Interview Score', value: practiceData.length ? Math.round(practiceData.reduce((a, b) => a + b.score, 0) / practiceData.length) + '%' : 'N/A', color: 'indigo' },
-                        { label: 'Avg Aptitude Score', value: aptitudeData.length ? Math.round(aptitudeData.reduce((a, b) => a + b.score, 0) / aptitudeData.length) + '%' : 'N/A', color: 'emerald' },
-                        { label: 'Total Sessions', value: practiceData.length + aptitudeData.length, color: 'violet' },
-                    ].map(s => (
-                        <div key={s.label} className="card text-center">
-                            <p className="text-2xl font-extrabold text-white">{s.value}</p>
-                            <p className="text-slate-400 text-sm mt-1">{s.label}</p>
-                        </div>
-                    ))}
-                </div>
-            )}
         </div>
     );
 }
