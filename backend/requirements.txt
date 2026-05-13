@@ -42,19 +42,17 @@ psycopg2-binary==2.9.11
 dj-database-url==3.1.2
 
 # ─── Google Gemini AI ─────────────────────────────────────────────────────────
-google-generativeai==0.8.6
-google-ai-generativelanguage==0.6.15
-google-api-core==2.30.0
-google-api-python-client==2.191.0
-google-auth==2.48.0
-google-auth-httplib2==0.3.0
-googleapis-common-protos==1.72.0
-grpcio==1.78.0
-grpcio-status==1.78.0
-proto-plus==1.27.1
-protobuf==5.29.6
-httplib2==0.31.2
-uritemplate==4.2.0
+google-generativeai>=0.8.0
+google-ai-generativelanguage>=0.6.0
+google-api-core[grpc]>=2.19.0
+google-api-python-client>=2.100.0
+google-auth>=2.20.0
+google-auth-httplib2>=0.2.0
+googleapis-common-protos>=1.62.0
+proto-plus>=1.22.0
+protobuf>=4.25.0
+httplib2>=0.20.0
+uritemplate>=4.1.0
 
 # ─── Cloudinary (Media Storage) ───────────────────────────────────────────────
 cloudinary==1.44.1
