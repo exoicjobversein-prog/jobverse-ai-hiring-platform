@@ -198,7 +198,7 @@ export default function StudentDashboard({ user }) {
                             </span>
                         </div>
                         <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                            {user?.first_name || user?.username} 👋
+                            {user?.first_name || user?.username} 
                         </h1>
                         <p className="mt-2 text-slate-400 text-sm max-w-md">
                             {user?.headline || 'Complete your profile to unlock all features and stand out to recruiters.'}
