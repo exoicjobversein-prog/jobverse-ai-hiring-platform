@@ -1,15 +1,13 @@
 import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import {
-    Bot, Eye, EyeOff, Upload, Building2, User2, ShieldCheck, X,
-    FileText, Sparkles, ArrowRight, GraduationCap, Briefcase, Users, Brain
-} from 'lucide-react';
+import { Bot, Eye, EyeOff, Upload, Building2, User2, ShieldCheck, X, FileText, ArrowRight, GraduationCap, Briefcase, Users, Brain } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import AuthBg from '../components/AuthBg';
 
 const PLACEMENT_ROLE = 'PLACEMENT_ADMIN';
 
-const COLLEGE_OPTIONS = [
+const COLLEGES = [
     'Indian Institute of Management (IIM) Indore',
     'Indian Institute of Technology (IIT) Indore',
     'Shri Govindram Seksaria Institute of Technology and Science (SGSITS)',
@@ -22,335 +20,285 @@ const COLLEGE_OPTIONS = [
     'Acropolis Institute of Technology and Research',
 ];
 
-const ROLE_OPTIONS = [
-    { value: 'STUDENT', label: 'Student / Job Seeker', icon: GraduationCap, color: 'indigo' },
-    { value: 'HR', label: 'HR Professional / Recruiter', icon: Briefcase, color: 'violet' },
-    { value: 'PROFESSIONAL', label: 'Industry Professional / Mentor', icon: Brain, color: 'emerald' },
-    { value: 'ALUMNI', label: 'Alumni', icon: Users, color: 'amber' },
-    { value: PLACEMENT_ROLE, label: 'Placement Department / College Admin', icon: Building2, color: 'rose' },
+const ROLES = [
+    { value:'STUDENT',        label:'Student / Job Seeker',              icon: GraduationCap },
+    { value:'HR',             label:'HR Professional / Recruiter',        icon: Briefcase     },
+    { value:'PROFESSIONAL',   label:'Industry Professional / Mentor',     icon: Brain         },
+    { value:'ALUMNI',         label:'Alumni',                             icon: Users         },
+    { value:PLACEMENT_ROLE,   label:'Placement Dept / College Admin',     icon: Building2     },
 ];
 
-const inputCls = 'w-full px-4 py-3 bg-white/5 border border-white/10 hover:border-white/20 focus:border-indigo-500 focus:bg-indigo-500/5 rounded-xl text-white placeholder-slate-500 text-sm outline-none transition-all duration-200';
-const labelCls = 'block text-sm font-semibold text-slate-300 mb-1.5';
+const inp = {
+    width:'100%', padding:'11px 14px', borderRadius:10, boxSizing:'border-box',
+    background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)',
+    color:'#fff', fontSize:13, outline:'none', transition:'border-color .2s,background .2s',
+};
+const onFoc = e => { e.target.style.borderColor='#6366f1'; e.target.style.background='rgba(99,102,241,0.08)'; };
+const onBlr = e => { e.target.style.borderColor='rgba(255,255,255,0.1)'; e.target.style.background='rgba(255,255,255,0.05)'; };
+const lbl = { display:'block', fontSize:12, fontWeight:600, color:'#94a3b8', marginBottom:6 };
 
 export default function Register() {
-    const [form, setForm] = useState({
-        username: '', email: '', password: '', role: 'STUDENT',
-        company_name: '', college_name: '', first_name: '', last_name: '',
-    });
-    const [placement, setPlacement] = useState({
-        college_name: '', college_email: '', college_location: '',
-        university_affiliation: '', officer_full_name: '',
-        officer_designation: '', officer_contact: '',
-    });
+    const [form, setForm] = useState({ username:'', email:'', password:'', role:'STUDENT', company_name:'', college_name:'', first_name:'', last_name:'' });
+    const [placement, setPlacement] = useState({ college_name:'', officer_designation:'', officer_contact:'' });
     const [proofFile, setProofFile] = useState(null);
     const [showPw, setShowPw] = useState(false);
     const [loading, setLoading] = useState(false);
     const fileInputRef = useRef(null);
     const navigate = useNavigate();
-
     const isPlacement = form.role === PLACEMENT_ROLE;
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        if (isPlacement && !proofFile) {
-            toast.error('Please upload your proof document (ID card / appointment letter).');
-            setLoading(false);
-            return;
-        }
+        e.preventDefault(); setLoading(true);
+        if (isPlacement && !proofFile) { toast.error('Please upload your proof document.'); setLoading(false); return; }
         try {
             if (isPlacement) {
-                const formData = new FormData();
-                Object.entries(form).forEach(([k, v]) => formData.append(k, v));
-                Object.entries(placement).forEach(([k, v]) => formData.append(k, v));
-                formData.append('proof_document', proofFile);
-                await api.post('/users/register/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-                toast.success('Application submitted! Your account is pending verification.', { duration: 5000 });
+                const fd = new FormData();
+                Object.entries(form).forEach(([k,v]) => fd.append(k,v));
+                Object.entries(placement).forEach(([k,v]) => fd.append(k,v));
+                fd.append('proof_document', proofFile);
+                await api.post('/users/register/', fd, { headers:{ 'Content-Type':'multipart/form-data' } });
+                toast.success('Application submitted! Pending verification.', { duration:5000 });
             } else {
                 await api.post('/users/register/', form);
                 toast.success('Account created! Please sign in.');
             }
             navigate('/login');
         } catch (err) {
-            if (err.response?.data) {
-                const msgs = Object.entries(err.response.data)
-                    .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(' ') : v}`)
-                    .join(' | ');
-                toast.error(msgs || 'Registration failed.');
-            } else {
-                toast.error('Registration failed. Please try again.');
-            }
-        } finally {
-            setLoading(false);
-        }
+            const msgs = err.response?.data
+                ? Object.entries(err.response.data).map(([k,v]) => `${k}: ${Array.isArray(v)?v.join(' '):v}`).join(' | ')
+                : 'Registration failed.';
+            toast.error(msgs);
+        } finally { setLoading(false); }
     };
 
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-        if (!validTypes.includes(file.type)) { toast.error('Only PDF, JPG, or PNG files are accepted.'); return; }
-        if (file.size > 5 * 1024 * 1024) { toast.error('File size must be under 5 MB.'); return; }
-        setProofFile(file);
+    const handleFile = (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        if (!['application/pdf','image/jpeg','image/png','image/jpg'].includes(f.type)) { toast.error('PDF, JPG or PNG only.'); return; }
+        if (f.size > 5*1024*1024) { toast.error('Max 5 MB.'); return; }
+        setProofFile(f);
     };
 
     return (
-        <div className="min-h-screen flex bg-black">
+        <div style={{ minHeight:'100vh', display:'flex', background:'#000' }}>
+            <style>{`@keyframes spinLoader{to{transform:rotate(360deg)}} @media(min-width:1024px){.reg-bg-panel{display:flex!important}}`}</style>
 
-            {/* ── Left Branding Panel ── */}
-            <div className="hidden lg:flex lg:w-5/12 relative overflow-hidden flex-col justify-between p-12 flex-shrink-0">
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-black to-violet-950" />
-                <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
-                <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-violet-600/10 rounded-full blur-[100px] pointer-events-none" />
-                <div className="absolute inset-0 opacity-[0.03]"
-                    style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+            {/* ── Left Form Panel (wide) ── */}
+            <div style={{ flex:1, position:'relative', display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'40px 24px', overflowY:'auto', background:'linear-gradient(135deg,#050508 60%,#0a0a14)' }}>
+                <div style={{ position:'absolute', top:'-10%', left:'-10%', width:400, height:400, borderRadius:'50%', background:'radial-gradient(circle,rgba(99,102,241,0.06) 0%,transparent 70%)', pointerEvents:'none' }} />
 
-                {/* Logo */}
-                <div className="relative z-10 flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                        <Bot size={22} className="text-white" />
-                    </div>
-                    <span className="text-white font-black text-xl tracking-tight">JobVerse <span className="text-indigo-400">AI</span></span>
-                </div>
-
-                {/* Hero Text */}
-                <div className="relative z-10">
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-indigo-300 text-xs font-semibold mb-6">
-                        <Sparkles size={12} /> Join 10,000+ Students
-                    </div>
-                    <h2 className="text-4xl font-black text-white leading-tight mb-4">
-                        Your career starts<br />
-                        <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-                            right here.
-                        </span>
-                    </h2>
-                    <p className="text-slate-400 text-sm leading-relaxed max-w-xs mb-8">
-                        Join JobVerse to get AI interview practice, smart job matches, and a network that opens doors.
-                    </p>
-
-                    {/* Role highlights */}
-                    <div className="space-y-3">
-                        {[
-                            { role: 'Students', desc: 'Practice AI interviews & apply to top companies', color: 'text-indigo-400' },
-                            { role: 'HR Teams', desc: 'Post jobs & screen candidates with AI', color: 'text-violet-400' },
-                            { role: 'Alumni', desc: 'Mentor juniors & stay connected', color: 'text-amber-400' },
-                        ].map(({ role, desc, color }) => (
-                            <div key={role} className="flex items-start gap-3">
-                                <span className={`text-xs font-black ${color} w-16 mt-0.5 flex-shrink-0`}>{role}</span>
-                                <p className="text-slate-500 text-xs leading-relaxed">{desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="relative z-10 flex items-center gap-8">
-                    {[['10K+', 'Users'], ['500+', 'Companies'], ['95%', 'Success Rate']].map(([val, label]) => (
-                        <div key={label}>
-                            <p className="text-xl font-black text-white">{val}</p>
-                            <p className="text-slate-500 text-xs mt-0.5">{label}</p>
+                <div style={{ position:'relative', zIndex:10, width:'100%', maxWidth:620 }}>
+                    {/* Header */}
+                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:32 }}>
+                        <div style={{ width:42, height:42, borderRadius:12, background:'linear-gradient(135deg,#6366f1,#7c3aed)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            <Bot size={20} color="#fff" />
                         </div>
-                    ))}
+                        <span style={{ color:'#fff', fontWeight:900, fontSize:18 }}>JobVerse <span style={{ color:'#818cf8' }}>AI</span></span>
+                    </div>
+
+                    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:24, padding:40, backdropFilter:'blur(20px)', boxShadow:'0 30px 60px rgba(0,0,0,0.5)' }}>
+                        <div style={{ marginBottom:28 }}>
+                            <h1 style={{ fontSize:28, fontWeight:900, color:'#fff' }}>Create your account</h1>
+                            <p style={{ color:'#64748b', fontSize:13, marginTop:6 }}>Free · Get started in under 2 minutes</p>
+                        </div>
+
+                        <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+                            {/* Name row */}
+                            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                                <div>
+                                    <label style={lbl}>First Name</label>
+                                    <input style={inp} onFocus={onFoc} onBlur={onBlr} value={form.first_name} onChange={e=>setForm({...form,first_name:e.target.value})} placeholder="Alex" />
+                                </div>
+                                <div>
+                                    <label style={lbl}>Last Name</label>
+                                    <input style={inp} onFocus={onFoc} onBlur={onBlr} value={form.last_name} onChange={e=>setForm({...form,last_name:e.target.value})} placeholder="Smith" />
+                                </div>
+                            </div>
+
+                            {/* Username + Email row */}
+                            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                                <div>
+                                    <label style={lbl}>Username <span style={{ color:'#f87171' }}>*</span></label>
+                                    <input style={inp} onFocus={onFoc} onBlur={onBlr} pattern="^[\w.@+\-]+$"
+                                        value={form.username} onChange={e=>setForm({...form,username:e.target.value})} required placeholder="alex_smith" />
+                                </div>
+                                <div>
+                                    <label style={lbl}>
+                                        Email
+                                        {isPlacement && <span style={{ color:'#fbbf24', marginLeft:4, fontWeight:400, fontSize:11 }}>(institutional only)</span>}
+                                    </label>
+                                    <input style={inp} onFocus={onFoc} onBlur={onBlr} type="email"
+                                        value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="alex@example.com" />
+                                </div>
+                            </div>
+
+                            {/* Password */}
+                            <div>
+                                <label style={lbl}>Password <span style={{ color:'#f87171' }}>*</span></label>
+                                <div style={{ position:'relative' }}>
+                                    <input style={{...inp,paddingRight:46}} onFocus={onFoc} onBlur={onBlr}
+                                        type={showPw?'text':'password'} value={form.password}
+                                        onChange={e=>setForm({...form,password:e.target.value})} required placeholder="Min. 8 characters" />
+                                    <button type="button" onClick={()=>setShowPw(!showPw)}
+                                        style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'#64748b', cursor:'pointer', padding:0 }}>
+                                        {showPw ? <EyeOff size={16}/> : <Eye size={16}/>}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Role radio */}
+                            <div>
+                                <label style={lbl}>I am a...</label>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                                    {ROLES.map(({ value, label, icon:Icon }) => {
+                                        const active = form.role === value;
+                                        return (
+                                            <label key={value} style={{
+                                                display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:10, cursor:'pointer',
+                                                background: active ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)',
+                                                border: active ? '1px solid rgba(99,102,241,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                                                transition:'all .15s',
+                                            }}>
+                                                <input type="radio" name="role" value={value} checked={active}
+                                                    onChange={e=>setForm({...form,role:e.target.value})} style={{ display:'none' }} />
+                                                <Icon size={15} color={active?'#818cf8':'#475569'} />
+                                                <span style={{ fontSize:12, fontWeight:600, color: active?'#e2e8f0':'#64748b' }}>{label}</span>
+                                                {active && <div style={{ marginLeft:'auto', width:7, height:7, borderRadius:'50%', background:'#818cf8' }} />}
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* College */}
+                            {(form.role==='STUDENT'||form.role==='ALUMNI') && (
+                                <div>
+                                    <label style={lbl}>College / University</label>
+                                    <select style={{...inp,cursor:'pointer'}} onFocus={onFoc} onBlur={onBlr}
+                                        value={form.college_name} onChange={e=>setForm({...form,college_name:e.target.value})}>
+                                        <option value="" style={{ background:'#0a0a14' }}>Select your college</option>
+                                        {COLLEGES.map(c=><option key={c} value={c} style={{ background:'#0a0a14' }}>{c}</option>)}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Company */}
+                            {(form.role==='HR'||form.role==='PROFESSIONAL'||form.role==='ALUMNI') && (
+                                <div>
+                                    <label style={lbl}>Company / Organization</label>
+                                    <input style={inp} onFocus={onFoc} onBlur={onBlr}
+                                        value={form.company_name} onChange={e=>setForm({...form,company_name:e.target.value})} placeholder="TechCorp Ltd." />
+                                </div>
+                            )}
+
+                            {/* Placement Admin extras */}
+                            {isPlacement && (
+                                <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:20, display:'flex', flexDirection:'column', gap:14 }}>
+                                    <div style={{ display:'flex', gap:10, padding:'10px 14px', borderRadius:10, background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.2)' }}>
+                                        <ShieldCheck size={15} color="#fbbf24" style={{ flexShrink:0, marginTop:1 }} />
+                                        <p style={{ fontSize:12, color:'#fde68a', lineHeight:1.5 }}>
+                                            This account will be <strong>pending verification</strong>. Access is granted after manual approval.
+                                        </p>
+                                    </div>
+
+                                    <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:-4 }}>
+                                        <Building2 size={12} color="#818cf8" />
+                                        <span style={{ fontSize:11, fontWeight:700, color:'#818cf8', letterSpacing:'0.08em', textTransform:'uppercase' }}>College Information</span>
+                                    </div>
+                                    <select style={{...inp,cursor:'pointer'}} onFocus={onFoc} onBlur={onBlr}
+                                        value={placement.college_name} onChange={e=>setPlacement({...placement,college_name:e.target.value})} required={isPlacement}>
+                                        <option value="" style={{ background:'#0a0a14' }}>Select your college</option>
+                                        {COLLEGES.map(c=><option key={c} value={c} style={{ background:'#0a0a14' }}>{c}</option>)}
+                                    </select>
+
+                                    <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:-4 }}>
+                                        <User2 size={12} color="#818cf8" />
+                                        <span style={{ fontSize:11, fontWeight:700, color:'#818cf8', letterSpacing:'0.08em', textTransform:'uppercase' }}>Placement Officer</span>
+                                    </div>
+                                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                                        <div>
+                                            <label style={lbl}>Designation <span style={{ color:'#475569', fontWeight:400 }}>(optional)</span></label>
+                                            <input style={inp} onFocus={onFoc} onBlur={onBlr} value={placement.officer_designation}
+                                                onChange={e=>setPlacement({...placement,officer_designation:e.target.value})} placeholder="T&P Officer" />
+                                        </div>
+                                        <div>
+                                            <label style={lbl}>Contact <span style={{ color:'#f87171' }}>*</span></label>
+                                            <input style={inp} onFocus={onFoc} onBlur={onBlr} type="tel" value={placement.officer_contact}
+                                                onChange={e=>setPlacement({...placement,officer_contact:e.target.value})} placeholder="+91 98765 43210" required={isPlacement} />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:10 }}>
+                                            <ShieldCheck size={12} color="#818cf8" />
+                                            <span style={{ fontSize:11, fontWeight:700, color:'#818cf8', letterSpacing:'0.08em', textTransform:'uppercase' }}>Verification Document <span style={{ color:'#f87171' }}>*</span></span>
+                                        </div>
+                                        <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={handleFile} />
+                                        {proofFile ? (
+                                            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:10, background:'rgba(16,185,129,0.08)', border:'1px solid rgba(16,185,129,0.2)' }}>
+                                                <FileText size={15} color="#34d399" />
+                                                <span style={{ fontSize:13, color:'#6ee7b7', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{proofFile.name}</span>
+                                                <button type="button" onClick={()=>{ setProofFile(null); fileInputRef.current.value=''; }}
+                                                    style={{ background:'none', border:'none', color:'#64748b', cursor:'pointer', padding:0 }}>
+                                                    <X size={14}/>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button type="button" onClick={()=>fileInputRef.current.click()} style={{
+                                                width:'100%', display:'flex', flexDirection:'column', alignItems:'center', gap:6,
+                                                padding:'20px', borderRadius:10, border:'2px dashed rgba(255,255,255,0.1)',
+                                                background:'none', cursor:'pointer', transition:'border-color .2s',
+                                            }}
+                                                onMouseEnter={e=>e.currentTarget.style.borderColor='rgba(99,102,241,0.5)'}
+                                                onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(255,255,255,0.1)'}>
+                                                <Upload size={18} color="#475569" />
+                                                <span style={{ fontSize:12, color:'#475569' }}>Click to upload • PDF, JPG, PNG • Max 5 MB</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            <button id="register-submit" type="submit" disabled={loading} style={{
+                                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                                padding:'14px 24px', borderRadius:12, fontWeight:700, fontSize:14,
+                                background:'linear-gradient(135deg,#6366f1,#7c3aed)', color:'#fff', border:'none',
+                                cursor: loading?'not-allowed':'pointer', opacity: loading?0.7:1,
+                                boxShadow:'0 8px 30px rgba(99,102,241,0.35)', marginTop:4,
+                            }}>
+                                {loading
+                                    ? <div style={{ width:20, height:20, border:'2px solid rgba(255,255,255,0.4)', borderTopColor:'#fff', borderRadius:'50%', animation:'spinLoader 0.8s linear infinite' }} />
+                                    : <><span>{isPlacement?'Submit for Verification':'Create Account'}</span><ArrowRight size={16}/></>}
+                            </button>
+                        </form>
+
+                        <div style={{ marginTop:24, paddingTop:20, borderTop:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
+                            <p style={{ color:'#64748b', fontSize:13 }}>
+                                Already have an account?{' '}
+                                <Link to="/login" style={{ color:'#818cf8', fontWeight:600, textDecoration:'none' }}>Sign in →</Link>
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* ── Right Form Panel ── */}
-            <div className="flex-1 flex items-start justify-center px-6 py-10 overflow-y-auto relative">
-                <div className="absolute inset-0 bg-black" />
-                <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-
-                <div className="relative z-10 w-full max-w-lg">
-                    {/* Mobile logo */}
-                    <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-                            <Bot size={20} className="text-white" />
-                        </div>
-                        <span className="text-white font-black text-lg">JobVerse <span className="text-indigo-400">AI</span></span>
-                    </div>
-
-                    <div className="mb-7">
-                        <h1 className="text-3xl font-black text-white">Create your account</h1>
-                        <p className="text-slate-400 mt-1.5 text-sm">It's free — get started in under 2 minutes</p>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Name Row */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className={labelCls}>First Name</label>
-                                <input className={inputCls} value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} placeholder="Alex" />
+            {/* ── Right 3D Background Panel ── */}
+            <div className="reg-bg-panel" style={{ display:'none', position:'relative', overflow:'hidden', flex:'0 0 38%' }}>
+                <AuthBg />
+                <div style={{ position:'relative', zIndex:10, padding:48, display:'flex', flexDirection:'column', justifyContent:'center', height:'100%' }}>
+                    <h2 style={{ fontSize:40, fontWeight:900, color:'#fff', lineHeight:1.2, marginBottom:16 }}>
+                        Your career<br/>starts{' '}
+                        <span style={{ background:'linear-gradient(90deg,#818cf8,#a78bfa)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>right here.</span>
+                    </h2>
+                    <p style={{ color:'#64748b', fontSize:14, lineHeight:1.7, maxWidth:280 }}>
+                        Join 10,000+ students, recruiters, and alumni on the platform built for modern hiring.
+                    </p>
+                    <div style={{ marginTop:40, display:'flex', gap:32 }}>
+                        {[['10K+','Users'],['500+','Companies'],['95%','Success']].map(([v,l])=>(
+                            <div key={l}>
+                                <p style={{ color:'#fff', fontWeight:900, fontSize:20 }}>{v}</p>
+                                <p style={{ color:'#475569', fontSize:11, marginTop:2 }}>{l}</p>
                             </div>
-                            <div>
-                                <label className={labelCls}>Last Name</label>
-                                <input className={inputCls} value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} placeholder="Smith" />
-                            </div>
-                        </div>
-
-                        {/* Username */}
-                        <div>
-                            <label className={labelCls}>Username <span className="text-red-400">*</span></label>
-                            <input className={inputCls} pattern="^[\w.@+\-]+$" title="Letters, numbers and @/./+/-/_ only"
-                                value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} required placeholder="alex_smith" />
-                        </div>
-
-                        {/* Email */}
-                        <div>
-                            <label className={labelCls}>
-                                Email
-                                {isPlacement && <span className="text-amber-400 ml-1 text-xs font-normal">(use institutional email)</span>}
-                            </label>
-                            <input className={inputCls} type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="alex@example.com" />
-                        </div>
-
-                        {/* Password */}
-                        <div>
-                            <label className={labelCls}>Password <span className="text-red-400">*</span></label>
-                            <div className="relative">
-                                <input className={`${inputCls} pr-12`} type={showPw ? 'text' : 'password'} value={form.password}
-                                    onChange={e => setForm({ ...form, password: e.target.value })} required placeholder="Min. 8 characters" />
-                                <button type="button" onClick={() => setShowPw(!showPw)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
-                                    {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Role Selector */}
-                        <div>
-                            <label className={labelCls}>I am a...</label>
-                            <div className="grid grid-cols-1 gap-2">
-                                {ROLE_OPTIONS.map(({ value, label, icon: Icon }) => (
-                                    <label key={value}
-                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all duration-200 ${form.role === value
-                                            ? 'bg-indigo-600/20 border-indigo-500/60 text-white'
-                                            : 'bg-white/5 border-white/10 hover:border-white/20 text-slate-300'}`}>
-                                        <input type="radio" name="role" value={value} checked={form.role === value}
-                                            onChange={e => setForm({ ...form, role: e.target.value })} className="sr-only" />
-                                        <Icon size={16} className={form.role === value ? 'text-indigo-400' : 'text-slate-500'} />
-                                        <span className="text-sm font-medium">{label}</span>
-                                        {form.role === value && <div className="ml-auto w-2 h-2 rounded-full bg-indigo-400" />}
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* College field for Student/Alumni */}
-                        {(form.role === 'STUDENT' || form.role === 'ALUMNI') && (
-                            <div>
-                                <label className={labelCls}>College / University</label>
-                                <select className={`${inputCls} cursor-pointer`} value={form.college_name}
-                                    onChange={e => setForm({ ...form, college_name: e.target.value })}>
-                                    <option value="" className="bg-black">Select your college</option>
-                                    {COLLEGE_OPTIONS.map(c => <option key={c} value={c} className="bg-black">{c}</option>)}
-                                </select>
-                            </div>
-                        )}
-
-                        {/* Company field */}
-                        {(form.role === 'HR' || form.role === 'PROFESSIONAL' || form.role === 'ALUMNI') && (
-                            <div>
-                                <label className={labelCls}>Company / Organization</label>
-                                <input className={inputCls} value={form.company_name}
-                                    onChange={e => setForm({ ...form, company_name: e.target.value })} placeholder="TechCorp Ltd." />
-                            </div>
-                        )}
-
-                        {/* ── Placement Admin Extra Fields ── */}
-                        {isPlacement && (
-                            <div className="space-y-4 p-5 rounded-2xl bg-white/[0.03] border border-white/10 mt-2">
-                                {/* Warning badge */}
-                                <div className="flex items-start gap-3 px-3 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                                    <ShieldCheck size={16} className="text-amber-400 shrink-0 mt-0.5" />
-                                    <p className="text-xs text-amber-300 leading-relaxed">
-                                        This account will be <span className="font-bold">pending verification</span>. Dashboard access is granted after manual approval.
-                                    </p>
-                                </div>
-
-                                {/* College Info */}
-                                <div>
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Building2 size={13} className="text-indigo-400" />
-                                        <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest">College Information</span>
-                                    </div>
-                                    <label className={labelCls}>College Name <span className="text-red-400">*</span></label>
-                                    <select className={`${inputCls} cursor-pointer`} value={placement.college_name}
-                                        onChange={e => setPlacement({ ...placement, college_name: e.target.value })} required={isPlacement}>
-                                        <option value="" className="bg-black">Select your college</option>
-                                        {COLLEGE_OPTIONS.map(c => <option key={c} value={c} className="bg-black">{c}</option>)}
-                                    </select>
-                                </div>
-
-                                {/* Officer Details */}
-                                <div>
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <User2 size={13} className="text-indigo-400" />
-                                        <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Placement Officer</span>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <label className={labelCls}>Designation <span className="text-slate-500 font-normal">(optional)</span></label>
-                                            <input className={inputCls} value={placement.officer_designation}
-                                                onChange={e => setPlacement({ ...placement, officer_designation: e.target.value })}
-                                                placeholder="Training & Placement Officer" />
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>Contact Number <span className="text-red-400">*</span></label>
-                                            <input className={inputCls} type="tel" value={placement.officer_contact}
-                                                onChange={e => setPlacement({ ...placement, officer_contact: e.target.value })}
-                                                placeholder="+91 98765 43210" required={isPlacement} />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* File Upload */}
-                                <div>
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <ShieldCheck size={13} className="text-indigo-400" />
-                                        <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Verification Document</span>
-                                    </div>
-                                    <label className={labelCls}>
-                                        Upload Proof <span className="text-red-400">*</span>
-                                        <span className="text-slate-500 font-normal ml-1 text-xs">(ID Card / Appointment Letter)</span>
-                                    </label>
-                                    <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleFileChange} />
-                                    {proofFile ? (
-                                        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                                            <FileText size={16} className="text-emerald-400 shrink-0" />
-                                            <span className="text-sm text-emerald-300 truncate flex-1">{proofFile.name}</span>
-                                            <button type="button"
-                                                onClick={() => { setProofFile(null); fileInputRef.current.value = ''; }}
-                                                className="text-slate-400 hover:text-red-400 transition-colors">
-                                                <X size={14} />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <button type="button" onClick={() => fileInputRef.current.click()}
-                                            className="w-full flex flex-col items-center justify-center gap-2 px-4 py-6 rounded-xl border-2 border-dashed border-white/10 hover:border-indigo-500 hover:bg-indigo-500/5 transition-all duration-200">
-                                            <Upload size={20} className="text-slate-500" />
-                                            <span className="text-sm text-slate-500">Click to upload • PDF, JPG, PNG • Max 5 MB</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Submit */}
-                        <button type="submit" disabled={loading} id="register-submit"
-                            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-indigo-600/20 active:scale-[0.98] text-sm mt-2">
-                            {loading
-                                ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                : <><span>{isPlacement ? 'Submit for Verification' : 'Create Account'}</span><ArrowRight size={16} /></>
-                            }
-                        </button>
-                    </form>
-
-                    <div className="mt-6 pt-6 border-t border-white/5 text-center">
-                        <p className="text-slate-400 text-sm">
-                            Already have an account?{' '}
-                            <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
-                                Sign in →
-                            </Link>
-                        </p>
+                        ))}
                     </div>
                 </div>
             </div>
