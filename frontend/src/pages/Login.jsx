@@ -36,10 +36,12 @@ export default function Login({ setUser }) {
             localStorage.setItem('user', JSON.stringify(user));
             setUser(user);
             toast.success(`Welcome back, ${user.first_name || user.username}!`);
-            if (user.role === 'HR') navigate('/hr/dashboard');
-            else if (user.role === 'ALUMNI') navigate('/alumni/dashboard');
-            else if (user.role === 'PLACEMENT_ADMIN') navigate('/placement/dashboard');
-            else navigate('/student/dashboard');
+            setTimeout(() => {
+                if (user.role === 'HR') window.location.href = '/hr/dashboard';
+                else if (user.role === 'ALUMNI') window.location.href = '/alumni/dashboard';
+                else if (user.role === 'PLACEMENT_ADMIN') window.location.href = '/placement/dashboard';
+                else window.location.href = '/student/dashboard';
+            }, 300);
         } catch (err) {
             toast.error(err.response?.data?.detail || 'Invalid credentials.');
         } finally { setLoading(false); }
