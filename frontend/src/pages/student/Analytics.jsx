@@ -25,7 +25,7 @@ export default function Analytics() {
 
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload?.length) return (
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm shadow-2xl">
+            <div className="bg-black border border-white/10 rounded-xl p-3 text-sm shadow-2xl">
                 <p className="font-bold text-white mb-1">{label}</p>
                 <p className="text-indigo-400">{payload[0]?.name}: <span className="font-extrabold text-white">{payload[0]?.value}%</span></p>
             </div>
@@ -44,14 +44,15 @@ export default function Analytics() {
     return (
         <div className="space-y-8">
             {/* Header */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-950 via-slate-900 to-indigo-950 border border-violet-500/20 p-7 shadow-2xl">
+            <div className="relative overflow-hidden rounded-3xl bg-black border border-white/10 p-7 shadow-2xl">
                 <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-violet-600/10 blur-3xl pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-indigo-600/5 blur-3xl pointer-events-none" />
                 <div className="relative flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg">
-                        <Activity size={22} className="text-white" />
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-xl shadow-violet-900/40">
+                        <Activity size={24} className="text-white" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-extrabold text-white tracking-tight">Performance Analytics</h1>
+                        <h1 className="text-4xl font-black text-white tracking-tight">Performance Analytics</h1>
                         <p className="text-slate-400 text-sm mt-1">Track your growth across interviews and aptitude tests</p>
                     </div>
                 </div>
@@ -105,7 +106,7 @@ export default function Analytics() {
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* AI Interview Score Line Chart */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                <div className="bg-black border border-white/10 rounded-2xl p-6 shadow-xl">
                     <div className="flex items-center gap-2 mb-6">
                         <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center">
                             <BarChart3 size={16} className="text-indigo-400" />
@@ -137,7 +138,7 @@ export default function Analytics() {
                 </div>
 
                 {/* Aptitude Bar Chart */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                <div className="bg-black border border-white/10 rounded-2xl p-6 shadow-xl">
                     <div className="flex items-center gap-2 mb-6">
                         <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center">
                             <Brain size={16} className="text-emerald-400" />

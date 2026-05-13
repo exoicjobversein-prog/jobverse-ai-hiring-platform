@@ -63,11 +63,16 @@ export default function StudentApplications({ user }) {
     return (
         <div className="space-y-8">
             {/* Header */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-950 via-slate-900 to-violet-950 border border-indigo-500/20 p-7 shadow-2xl">
+            <div className="relative overflow-hidden rounded-3xl bg-black border border-white/10 p-7 shadow-2xl">
                 <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-indigo-600/10 blur-3xl pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-violet-600/5 blur-3xl pointer-events-none" />
                 <div className="relative">
-                    <h1 className="text-3xl font-extrabold text-white tracking-tight">My Applications</h1>
-                    <p className="text-slate-400 text-sm mt-1">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 text-xs font-semibold mb-3">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                        Applications Tracker
+                    </div>
+                    <h1 className="text-4xl font-black text-white tracking-tight">My Applications</h1>
+                    <p className="text-slate-400 text-sm mt-2">
                         {counts.total} total · {counts.shortlisted} shortlisted · {counts.accepted} accepted
                     </p>
                 </div>
@@ -108,7 +113,7 @@ export default function StudentApplications({ user }) {
                         const iv = getInterview(app.id);
                         const accent = STATUS_ACCENT[app.status] || 'bg-slate-600';
                         return (
-                            <div key={app.id} className="group relative overflow-hidden bg-slate-900 border border-slate-700/60 hover:border-indigo-500/40 rounded-2xl p-5 transition-all duration-300 shadow-lg hover:shadow-indigo-500/10">
+                            <div key={app.id} className="group relative overflow-hidden bg-black border border-white/10 hover:border-white/20 rounded-2xl p-5 transition-all duration-300 shadow-lg hover:shadow-indigo-500/10">
                                 {/* Left accent bar */}
                                 <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${accent}`} />
 
@@ -130,9 +135,9 @@ export default function StudentApplications({ user }) {
 
                                     {/* AI Interview section */}
                                     {iv && (
-                                        <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between gap-4">
+                                        <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between gap-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center">
+                                                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
                                                     <Bot size={15} className="text-indigo-400" />
                                                 </div>
                                                 <div>
