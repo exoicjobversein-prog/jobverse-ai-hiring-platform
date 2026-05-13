@@ -151,7 +151,7 @@ export default function Login({ setUser }) {
                                     <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 8, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Username</label>
                                     <input id="login-username" style={inp} onFocus={onFoc} onBlur={onBlr}
                                         value={form.username} onChange={e => setForm({ ...form, username: e.target.value })}
-                                        required placeholder="your_username" autoComplete="username" />
+                                        required placeholder="username" autoComplete="username" />
                                 </div>
                                 <div>
                                     <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 8, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Password</label>
