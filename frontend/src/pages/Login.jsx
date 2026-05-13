@@ -6,21 +6,21 @@ import api from '../services/api';
 import AuthBg from '../components/AuthBg';
 
 const features = [
-    { icon: Brain,    label: 'AI Interview Engine', desc: 'Practice with role-specific AI questions' },
-    { icon: Briefcase,label: 'Smart Job Matching',  desc: 'Roles tailored to your profile'          },
-    { icon: Users,    label: 'Alumni Network',       desc: 'Mentors from top companies'              },
+    { icon: Brain,     label: 'AI Interview Engine', desc: 'Practice with role-specific AI questions' },
+    { icon: Briefcase, label: 'Smart Job Matching',  desc: 'Roles tailored to your profile'          },
+    { icon: Users,     label: 'Alumni Network',       desc: 'Mentors from top companies'              },
 ];
 
 const inp = {
-    width:'100%', padding:'13px 16px', borderRadius:12,
-    background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)',
-    color:'#fff', fontSize:14, outline:'none', transition:'border-color .2s,background .2s',
+    width: '100%', padding: '13px 16px', borderRadius: 12, boxSizing: 'border-box',
+    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+    color: '#fff', fontSize: 14, outline: 'none', transition: 'border-color .2s,background .2s',
 };
-const onFoc = e => { e.target.style.borderColor='#6366f1'; e.target.style.background='rgba(99,102,241,0.08)'; };
-const onBlr = e => { e.target.style.borderColor='rgba(255,255,255,0.1)'; e.target.style.background='rgba(255,255,255,0.05)'; };
+const onFoc = e => { e.target.style.borderColor = '#6366f1'; e.target.style.background = 'rgba(99,102,241,0.1)'; };
+const onBlr = e => { e.target.style.borderColor = 'rgba(255,255,255,0.12)'; e.target.style.background = 'rgba(255,255,255,0.06)'; };
 
 export default function Login({ setUser }) {
-    const [form, setForm] = useState({ username:'', password:'' });
+    const [form, setForm] = useState({ username: '', password: '' });
     const [showPw, setShowPw] = useState(false);
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -46,109 +46,162 @@ export default function Login({ setUser }) {
     };
 
     return (
-        <div style={{ minHeight:'100vh', display:'flex', background:'#000' }}>
+        <div style={{ minHeight: '100vh', position: 'relative', display: 'flex', background: '#000', overflow: 'hidden' }}>
+            <style>{`
+                @keyframes spinLoader { to { transform: rotate(360deg); } }
+                @keyframes fadeSlideUp {
+                    from { opacity: 0; transform: translateY(24px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                }
+            `}</style>
 
-            {/* ── Left 3D Panel ── */}
-            <div style={{ display:'none', position:'relative', overflow:'hidden', flexDirection:'column', justifyContent:'space-between', padding:'56px', flex:'0 0 50%' }}
-                className="lg-panel">
-                <style>{`.lg-panel{display:none} @media(min-width:1024px){.lg-panel{display:flex}}`}</style>
-                <AuthBg />
+            {/* ── Full-screen 3D Background ── */}
+            <AuthBg />
 
-                {/* Logo */}
-                <div style={{ position:'relative', zIndex:10, display:'flex', alignItems:'center', gap:12 }}>
-                    <div style={{ width:44, height:44, borderRadius:12, background:'linear-gradient(135deg,#6366f1,#7c3aed)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 4px 20px rgba(99,102,241,0.4)' }}>
-                        <Bot size={22} color="#fff" />
+            {/* ── Content layer ── */}
+            <div style={{ position: 'relative', zIndex: 10, width: '100%', display: 'flex', minHeight: '100vh' }}>
+
+                {/* Left branding panel — visible on lg screens */}
+                <div style={{ flex: '0 0 55%', display: 'none', flexDirection: 'column', justifyContent: 'space-between', padding: '56px 64px' }}
+                    className="login-left-panel">
+                    <style>{`@media(min-width:1024px){.login-left-panel{display:flex!important}}`}</style>
+
+                    {/* Logo */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#6366f1,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(99,102,241,0.45)' }}>
+                            <Bot size={22} color="#fff" />
+                        </div>
+                        <span style={{ color: '#fff', fontWeight: 900, fontSize: 20, letterSpacing: '-0.5px' }}>
+                            JobVerse <span style={{ color: '#818cf8' }}>AI</span>
+                        </span>
                     </div>
-                    <span style={{ color:'#fff', fontWeight:900, fontSize:20, letterSpacing:'-0.5px' }}>JobVerse <span style={{ color:'#818cf8' }}>AI</span></span>
-                </div>
 
-                {/* Hero */}
-                <div style={{ position:'relative', zIndex:10 }}>
-                    <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:999, background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.3)', color:'#a5b4fc', fontSize:12, fontWeight:600, marginBottom:24 }}>
-                        <Sparkles size={12} /> AI-Powered Hiring Platform
+                    {/* Hero text */}
+                    <div style={{ animation: 'fadeSlideUp .8s ease forwards' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 999, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc', fontSize: 12, fontWeight: 600, marginBottom: 24 }}>
+                            <Sparkles size={12} /> AI-Powered Hiring Platform
+                        </div>
+                        <h2 style={{ fontSize: 52, fontWeight: 900, color: '#fff', lineHeight: 1.1, marginBottom: 18 }}>
+                            Land your dream<br />
+                            <span style={{ background: 'linear-gradient(90deg,#818cf8,#a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                                job faster.
+                            </span>
+                        </h2>
+                        <p style={{ color: '#64748b', fontSize: 15, lineHeight: 1.75, maxWidth: 360, marginBottom: 44 }}>
+                            Prepare smarter with AI interviews, discover the perfect match, and build connections that accelerate your career.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                            {features.map(({ icon: Icon, label, desc }) => (
+                                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                                    <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 20px rgba(99,102,241,0.1)' }}>
+                                        <Icon size={20} color="#818cf8" />
+                                    </div>
+                                    <div>
+                                        <p style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 14 }}>{label}</p>
+                                        <p style={{ color: '#475569', fontSize: 13, marginTop: 3 }}>{desc}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                    <h2 style={{ fontSize:48, fontWeight:900, color:'#fff', lineHeight:1.15, marginBottom:16 }}>
-                        Land your dream<br />
-                        <span style={{ background:'linear-gradient(90deg,#818cf8,#a78bfa)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>job faster.</span>
-                    </h2>
-                    <p style={{ color:'#64748b', fontSize:14, lineHeight:1.7, maxWidth:320, marginBottom:36 }}>
-                        Prepare smarter with AI interviews, discover the perfect match, and build connections that accelerate your career.
-                    </p>
-                    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-                        {features.map(({ icon: Icon, label, desc }) => (
-                            <div key={label} style={{ display:'flex', alignItems:'flex-start', gap:16 }}>
-                                <div style={{ width:40, height:40, borderRadius:10, background:'rgba(99,102,241,0.12)', border:'1px solid rgba(99,102,241,0.2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                                    <Icon size={18} color="#818cf8" />
-                                </div>
-                                <div>
-                                    <p style={{ color:'#fff', fontWeight:600, fontSize:14 }}>{label}</p>
-                                    <p style={{ color:'#475569', fontSize:12, marginTop:2 }}>{desc}</p>
-                                </div>
+
+                    {/* Stats */}
+                    <div style={{ display: 'flex', gap: 48 }}>
+                        {[['10K+', 'Students'], ['500+', 'Companies'], ['95%', 'Placement Rate']].map(([v, l]) => (
+                            <div key={l}>
+                                <p style={{ color: '#fff', fontWeight: 900, fontSize: 24 }}>{v}</p>
+                                <p style={{ color: '#475569', fontSize: 12, marginTop: 3 }}>{l}</p>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                {/* Stats */}
-                <div style={{ position:'relative', zIndex:10, display:'flex', gap:40 }}>
-                    {[['10K+','Students'],['500+','Companies'],['95%','Placement Rate']].map(([v,l]) => (
-                        <div key={l}>
-                            <p style={{ color:'#fff', fontWeight:900, fontSize:22 }}>{v}</p>
-                            <p style={{ color:'#475569', fontSize:11, marginTop:2 }}>{l}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
+                {/* Right form panel */}
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 24px' }}>
+                    {/* Glassmorphism glow behind card */}
+                    <div style={{ position: 'absolute', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle,rgba(99,102,241,0.12) 0%,transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
 
-            {/* ── Right Form Panel ── */}
-            <div style={{ flex:1, position:'relative', display:'flex', alignItems:'center', justifyContent:'center', padding:'48px 24px', overflow:'hidden', background:'linear-gradient(135deg,#050508 60%,#0a0a14)' }}>
-                <div style={{ position:'absolute', top:'-20%', right:'-10%', width:500, height:500, borderRadius:'50%', background:'radial-gradient(circle,rgba(99,102,241,0.07) 0%,transparent 70%)', pointerEvents:'none' }} />
-
-                <div style={{ position:'relative', zIndex:10, width:'100%', maxWidth:440 }}>
-                    <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:24, padding:40, backdropFilter:'blur(20px)', boxShadow:'0 30px 60px rgba(0,0,0,0.5)' }}>
-                        <div style={{ marginBottom:32 }}>
-                            <h1 style={{ fontSize:30, fontWeight:900, color:'#fff' }}>Welcome back</h1>
-                            <p style={{ color:'#64748b', fontSize:13, marginTop:6 }}>Sign in to continue your journey</p>
-                        </div>
-
-                        <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:18 }}>
-                            <div>
-                                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#cbd5e1', marginBottom:8 }}>Username</label>
-                                <input id="login-username" style={inp} onFocus={onFoc} onBlur={onBlr}
-                                    value={form.username} onChange={e => setForm({...form, username:e.target.value})}
-                                    required placeholder="your_username" />
+                    <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 440, animation: 'fadeSlideUp .9s ease forwards' }}>
+                        {/* Mobile logo */}
+                        <div className="login-mobile-logo" style={{ display: 'flex', justifyContent: 'center', marginBottom: 36 }}>
+                            <style>{`@media(min-width:1024px){.login-mobile-logo{display:none!important}}`}</style>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ width: 42, height: 42, borderRadius: 12, background: 'linear-gradient(135deg,#6366f1,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Bot size={20} color="#fff" />
+                                </div>
+                                <span style={{ color: '#fff', fontWeight: 900, fontSize: 18 }}>JobVerse <span style={{ color: '#818cf8' }}>AI</span></span>
                             </div>
-                            <div>
-                                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#cbd5e1', marginBottom:8 }}>Password</label>
-                                <div style={{ position:'relative' }}>
-                                    <input id="login-password" style={{...inp, paddingRight:48}} onFocus={onFoc} onBlur={onBlr}
-                                        type={showPw ? 'text' : 'password'} value={form.password}
-                                        onChange={e => setForm({...form, password:e.target.value})} required placeholder="••••••••" />
-                                    <button type="button" onClick={() => setShowPw(!showPw)}
-                                        style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'#64748b', cursor:'pointer', padding:0 }}>
-                                        {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
-                                    </button>
+                        </div>
+
+                        {/* Card */}
+                        <div style={{
+                            background: 'rgba(10,10,20,0.75)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: 28,
+                            padding: '44px 40px',
+                            backdropFilter: 'blur(30px)',
+                            WebkitBackdropFilter: 'blur(30px)',
+                            boxShadow: '0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.08), inset 0 1px 0 rgba(255,255,255,0.06)',
+                        }}>
+                            {/* Card top badge */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+                                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg,#6366f1,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(99,102,241,0.4)' }}>
+                                    <Bot size={19} color="#fff" />
+                                </div>
+                                <div>
+                                    <p style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>Sign in to JobVerse</p>
+                                    <p style={{ color: '#475569', fontSize: 12 }}>Your AI-powered career platform</p>
                                 </div>
                             </div>
-                            <button id="login-submit" type="submit" disabled={loading} style={{
-                                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                                padding:'14px 24px', borderRadius:12, fontWeight:700, fontSize:14,
-                                background:'linear-gradient(135deg,#6366f1,#7c3aed)', color:'#fff', border:'none',
-                                cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
-                                boxShadow:'0 8px 30px rgba(99,102,241,0.35)', marginTop:4,
-                            }}>
-                                {loading
-                                    ? <div style={{ width:20, height:20, border:'2px solid rgba(255,255,255,0.4)', borderTopColor:'#fff', borderRadius:'50%', animation:'spinLoader 0.8s linear infinite' }} />
-                                    : <><span>Sign In</span><ArrowRight size={16}/></>}
-                            </button>
-                            <style>{`@keyframes spinLoader{to{transform:rotate(360deg)}}`}</style>
-                        </form>
 
-                        <div style={{ marginTop:28, paddingTop:24, borderTop:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
-                            <p style={{ color:'#64748b', fontSize:13 }}>
-                                Don't have an account?{' '}
-                                <Link to="/register" style={{ color:'#818cf8', fontWeight:600, textDecoration:'none' }}>Create one free →</Link>
-                            </p>
+                            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 8, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Username</label>
+                                    <input id="login-username" style={inp} onFocus={onFoc} onBlur={onBlr}
+                                        value={form.username} onChange={e => setForm({ ...form, username: e.target.value })}
+                                        required placeholder="your_username" autoComplete="username" />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 8, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Password</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input id="login-password" style={{ ...inp, paddingRight: 50 }} onFocus={onFoc} onBlur={onBlr}
+                                            type={showPw ? 'text' : 'password'} value={form.password}
+                                            onChange={e => setForm({ ...form, password: e.target.value })}
+                                            required placeholder="••••••••" autoComplete="current-password" />
+                                        <button type="button" onClick={() => setShowPw(!showPw)}
+                                            style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}>
+                                            {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button id="login-submit" type="submit" disabled={loading} style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                                    padding: '14px 24px', borderRadius: 14, fontWeight: 800, fontSize: 14,
+                                    background: 'linear-gradient(135deg,#6366f1,#7c3aed)',
+                                    color: '#fff', border: 'none',
+                                    cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
+                                    boxShadow: '0 8px 30px rgba(99,102,241,0.4)', marginTop: 6,
+                                    transition: 'opacity .2s, transform .1s',
+                                }}
+                                    onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = '0.88'; }}
+                                    onMouseLeave={e => e.currentTarget.style.opacity = loading ? '0.7' : '1'}
+                                    onMouseDown={e => { if (!loading) e.currentTarget.style.transform = 'scale(0.98)'; }}
+                                    onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
+                                    {loading
+                                        ? <div style={{ width: 20, height: 20, border: '2px solid rgba(255,255,255,0.35)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spinLoader .8s linear infinite' }} />
+                                        : <><span>Sign In</span><ArrowRight size={16} /></>}
+                                </button>
+                            </form>
+
+                            <div style={{ marginTop: 28, paddingTop: 24, borderTop: '1px solid rgba(255,255,255,0.07)', textAlign: 'center' }}>
+                                <p style={{ color: '#475569', fontSize: 13 }}>
+                                    Don't have an account?{' '}
+                                    <Link to="/register" style={{ color: '#818cf8', fontWeight: 700, textDecoration: 'none' }}>
+                                        Create one free →
+                                    </Link>
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
