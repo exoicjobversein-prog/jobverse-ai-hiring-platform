@@ -292,14 +292,7 @@ export default function Register() {
                     <p style={{ color:'#64748b', fontSize:14, lineHeight:1.7, maxWidth:280 }}>
                         Join 10,000+ students, recruiters, and alumni on the platform built for modern hiring.
                     </p>
-                    <div style={{ marginTop:40, display:'flex', gap:32 }}>
-                        {[['10K+','Users'],['500+','Companies'],['95%','Success']].map(([v,l])=>(
-                            <div key={l}>
-                                <p style={{ color:'#fff', fontWeight:900, fontSize:20 }}>{v}</p>
-                                <p style={{ color:'#475569', fontSize:11, marginTop:2 }}>{l}</p>
-                            </div>
-                        ))}
-                    </div>
+
                 </div>
             </div>
         </div>

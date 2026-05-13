@@ -105,15 +105,7 @@ export default function Login({ setUser }) {
                         </div>
                     </div>
 
-                    {/* Stats */}
-                    <div style={{ display: 'flex', gap: 48 }}>
-                        {[['10K+', 'Students'], ['500+', 'Companies'], ['95%', 'Placement Rate']].map(([v, l]) => (
-                            <div key={l}>
-                                <p style={{ color: '#fff', fontWeight: 900, fontSize: 24 }}>{v}</p>
-                                <p style={{ color: '#475569', fontSize: 12, marginTop: 3 }}>{l}</p>
-                            </div>
-                        ))}
-                    </div>
+
                 </div>
 
                 {/* Right form panel */}
