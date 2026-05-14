@@ -1,4 +1,5 @@
 import json
+import asyncio
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.utils import timezone
@@ -29,8 +30,13 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
         # Set online
         await self.set_online(True)
 
-        # Join group
+        # Join room group
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        
+        # Join personal group for global signaling (like calls)
+        self.personal_group = f'user_{self.user.id}'
+        await self.channel_layer.group_add(self.personal_group, self.channel_name)
+        
         await self.accept()
 
         # Notify group that user came online
@@ -44,15 +50,20 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         if hasattr(self, 'room_group_name'):
             await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        if hasattr(self, 'personal_group'):
+            await self.channel_layer.group_discard(self.personal_group, self.channel_name)
 
         if self.user and self.user.is_authenticated:
-            await self.set_online(False)
-            await self.channel_layer.group_send(self.room_group_name, {
-                'type': 'user_status',
-                'user_id': self.user.id,
-                'username': self.user.username,
-                'is_online': False,
-            })
+            # Delay offline status to prevent race conditions when switching rooms
+            await asyncio.sleep(2)
+            is_offline = await self.check_and_set_offline()
+            if is_offline:
+                await self.channel_layer.group_send(self.room_group_name, {
+                    'type': 'user_status',
+                    'user_id': self.user.id,
+                    'username': self.user.username,
+                    'is_online': False,
+                })
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -115,6 +126,14 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
             'is_online': event['is_online'],
         }))
 
+    async def call_signal(self, event):
+        # Handle global call signals received on personal group
+        await self.send(text_data=json.dumps({
+            'type': 'call_signal',
+            'signal': event['signal'],
+            'sender_id': event['sender_id'],
+        }))
+
     # ── DB helpers ────────────────────────────────────────────────────────────
 
     @database_sync_to_async
@@ -152,6 +171,19 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
         obj.is_online = status
         obj.save()
 
+    @database_sync_to_async
+    def check_and_set_offline(self):
+        from .models import OnlineStatus
+        obj = OnlineStatus.objects.filter(user=self.user).first()
+        if obj:
+            # If last_seen is very recent, a new connection was made, do not set offline
+            diff = timezone.now() - obj.last_seen
+            if diff.total_seconds() > 1.5:
+                obj.is_online = False
+                obj.save()
+                return True
+        return False
+
 
 class DMChatConsumer(AsyncWebsocketConsumer):
     """Handles real-time DM between two users."""
@@ -172,14 +204,25 @@ class DMChatConsumer(AsyncWebsocketConsumer):
             return
 
         await self.set_online(True)
+        
+        # Join DM room
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        
+        # Join personal group
+        self.personal_group = f'user_{self.user.id}'
+        await self.channel_layer.group_add(self.personal_group, self.channel_name)
+        
         await self.accept()
 
     async def disconnect(self, close_code):
         if hasattr(self, 'room_group_name'):
             await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        if hasattr(self, 'personal_group'):
+            await self.channel_layer.group_discard(self.personal_group, self.channel_name)
+            
         if self.user and self.user.is_authenticated:
-            await self.set_online(False)
+            await asyncio.sleep(2)
+            await self.check_and_set_offline()
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -194,12 +237,15 @@ class DMChatConsumer(AsyncWebsocketConsumer):
             return
 
         if data.get('type') == 'call_signal':
-            # Broadcast WebRTC signal (offer/answer/ice) to the group
-            await self.channel_layer.group_send(self.room_group_name, {
-                'type': 'call_signal',
-                'signal': data.get('signal'),
-                'sender_id': self.user.id,
-            })
+            # Route WebRTC signal to the SPECIFIC target user's personal group
+            # This ensures they get the call even if they are in another channel
+            other_user = await self.get_room_other_user()
+            if other_user:
+                await self.channel_layer.group_send(f'user_{other_user.id}', {
+                    'type': 'call_signal',
+                    'signal': data.get('signal'),
+                    'sender_id': self.user.id,
+                })
             return
 
         content = data.get('content', '').strip()
@@ -252,6 +298,15 @@ class DMChatConsumer(AsyncWebsocketConsumer):
             return False
 
     @database_sync_to_async
+    def get_room_other_user(self):
+        from .models import DirectChatRoom
+        try:
+            room = DirectChatRoom.objects.get(id=self.room_id)
+            return room.user1 if room.user2 == self.user else room.user2
+        except DirectChatRoom.DoesNotExist:
+            return None
+
+    @database_sync_to_async
     def save_dm(self, content):
         from .models import DirectChatRoom, DirectMessage
         room = DirectChatRoom.objects.get(id=self.room_id)
@@ -263,3 +318,15 @@ class DMChatConsumer(AsyncWebsocketConsumer):
         obj, _ = OnlineStatus.objects.get_or_create(user=self.user)
         obj.is_online = status
         obj.save()
+
+    @database_sync_to_async
+    def check_and_set_offline(self):
+        from .models import OnlineStatus
+        obj = OnlineStatus.objects.filter(user=self.user).first()
+        if obj:
+            diff = timezone.now() - obj.last_seen
+            if diff.total_seconds() > 1.5:
+                obj.is_online = False
+                obj.save()
+                return True
+        return False

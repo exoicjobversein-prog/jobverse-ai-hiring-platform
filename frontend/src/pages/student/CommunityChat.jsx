@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { 
     Send, Hash, MessageSquare, Users, Plus, 
     MoreVertical, Circle, User as UserIcon, X,
