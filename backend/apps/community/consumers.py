@@ -55,8 +55,9 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
 
         if self.user and self.user.is_authenticated:
             # Delay offline status to prevent race conditions when switching rooms
+            disconnect_time = timezone.now()
             await asyncio.sleep(2)
-            is_offline = await self.check_and_set_offline()
+            is_offline = await self.check_and_set_offline(disconnect_time)
             if is_offline:
                 await self.channel_layer.group_send(self.room_group_name, {
                     'type': 'user_status',
@@ -77,6 +78,16 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
                 'username': self.user.username,
                 'is_typing': data.get('is_typing', False),
             })
+            return
+
+        if msg_type == 'call_signal':
+            target_id = data.get('target_user_id')
+            if target_id:
+                await self.channel_layer.group_send(f'user_{target_id}', {
+                    'type': 'call_signal',
+                    'signal': data.get('signal'),
+                    'sender_id': self.user.id,
+                })
             return
 
         content = data.get('content', '').strip()
@@ -172,16 +183,16 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
         obj.save()
 
     @database_sync_to_async
-    def check_and_set_offline(self):
+    def check_and_set_offline(self, disconnect_time):
         from .models import OnlineStatus
         obj = OnlineStatus.objects.filter(user=self.user).first()
         if obj:
-            # If last_seen is very recent, a new connection was made, do not set offline
-            diff = timezone.now() - obj.last_seen
-            if diff.total_seconds() > 1.5:
-                obj.is_online = False
-                obj.save()
-                return True
+            # If last_seen is GREATER than disconnect_time, a new connection was made
+            if obj.last_seen > disconnect_time:
+                return False
+            obj.is_online = False
+            obj.save()
+            return True
         return False
 
 
@@ -221,8 +232,9 @@ class DMChatConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_discard(self.personal_group, self.channel_name)
             
         if self.user and self.user.is_authenticated:
+            disconnect_time = timezone.now()
             await asyncio.sleep(2)
-            await self.check_and_set_offline()
+            await self.check_and_set_offline(disconnect_time)
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -237,11 +249,14 @@ class DMChatConsumer(AsyncWebsocketConsumer):
             return
 
         if data.get('type') == 'call_signal':
-            # Route WebRTC signal to the SPECIFIC target user's personal group
-            # This ensures they get the call even if they are in another channel
-            other_user = await self.get_room_other_user()
-            if other_user:
-                await self.channel_layer.group_send(f'user_{other_user.id}', {
+            target_id = data.get('target_user_id')
+            if not target_id:
+                other_user = await self.get_room_other_user()
+                if other_user:
+                    target_id = other_user.id
+            
+            if target_id:
+                await self.channel_layer.group_send(f'user_{target_id}', {
                     'type': 'call_signal',
                     'signal': data.get('signal'),
                     'sender_id': self.user.id,
@@ -320,13 +335,13 @@ class DMChatConsumer(AsyncWebsocketConsumer):
         obj.save()
 
     @database_sync_to_async
-    def check_and_set_offline(self):
+    def check_and_set_offline(self, disconnect_time):
         from .models import OnlineStatus
         obj = OnlineStatus.objects.filter(user=self.user).first()
         if obj:
-            diff = timezone.now() - obj.last_seen
-            if diff.total_seconds() > 1.5:
-                obj.is_online = False
-                obj.save()
-                return True
+            if obj.last_seen > disconnect_time:
+                return False
+            obj.is_online = False
+            obj.save()
+            return True
         return False

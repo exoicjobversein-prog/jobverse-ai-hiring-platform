@@ -147,14 +147,18 @@ export default function CommunityChat({ user }) {
         const token = localStorage.getItem('access_token');
         if (!token) return;
 
-        // Determine URL based on room type
+        // Dynamic WebSocket URL
+        const backendApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+        const backendHost = new URL(backendApiUrl).host;
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
         let wsUrl = '';
         if (activeChat.type === 'channel') {
             const ch = channels.find(c => c.id === activeChat.id);
             if (!ch) return;
-            wsUrl = `ws://localhost:8000/ws/chat/channel/${ch.name}/?token=${token}`;
+            wsUrl = `${wsProtocol}//${backendHost}/ws/chat/channel/${ch.name}/?token=${token}`;
         } else {
-            wsUrl = `ws://localhost:8000/ws/chat/dm/${activeChat.id}/?token=${token}`;
+            wsUrl = `${wsProtocol}//${backendHost}/ws/chat/dm/${activeChat.id}/?token=${token}`;
         }
 
         const ws = new WebSocket(wsUrl);
@@ -230,8 +234,13 @@ export default function CommunityChat({ user }) {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
+            // Find target user ID
+            const room = dmRooms.find(r => r.id === activeChat.id);
+            const targetUserId = room?.other_user?.id;
+
             wsRef.current.send(JSON.stringify({
                 type: 'call_signal',
+                target_user_id: targetUserId,
                 signal: {
                     type: 'offer',
                     offer,
@@ -272,6 +281,7 @@ export default function CommunityChat({ user }) {
 
             wsRef.current.send(JSON.stringify({
                 type: 'call_signal',
+                target_user_id: callState.callerId,
                 signal: { type: 'answer', answer }
             }));
         } catch (err) {
@@ -302,8 +312,12 @@ export default function CommunityChat({ user }) {
 
         pc.onicecandidate = (e) => {
             if (e.candidate) {
+                // If we are incoming, send to callerId. Otherwise we are the caller, send to the dm room's other user
+                const targetUserId = callState.isIncoming ? callState.callerId : dmRooms.find(r => r.id === activeChat.id)?.other_user?.id;
+                
                 wsRef.current.send(JSON.stringify({
                     type: 'call_signal',
+                    target_user_id: targetUserId,
                     signal: { type: 'ice', candidate: e.candidate }
                 }));
             }
@@ -319,8 +333,10 @@ export default function CommunityChat({ user }) {
         dialingRef.current.currentTime = 0;
 
         if (notify && wsRef.current) {
+            const targetUserId = callState.isIncoming ? callState.callerId : dmRooms.find(r => r.id === activeChat.id)?.other_user?.id;
             wsRef.current.send(JSON.stringify({
                 type: 'call_signal',
+                target_user_id: targetUserId,
                 signal: { type: 'hangup' }
             }));
         }
