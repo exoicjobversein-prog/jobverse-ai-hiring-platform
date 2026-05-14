@@ -155,7 +155,19 @@ class OnlineUsersView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        statuses = OnlineStatus.objects.filter(is_online=True).select_related('user')
+        from django.utils import timezone
+        from datetime import timedelta
+        from django.db.models import Q
+        
+        # Update current user's last_seen unconditionally since they are actively polling
+        OnlineStatus.objects.update_or_create(user=request.user, defaults={'is_online': True})
+        
+        # Consider online if is_online=True OR last_seen is within the last 20 seconds
+        cutoff = timezone.now() - timedelta(seconds=20)
+        statuses = OnlineStatus.objects.filter(
+            Q(is_online=True) | Q(last_seen__gte=cutoff)
+        ).select_related('user')
+        
         return Response(OnlineStatusSerializer(statuses, many=True, context={'request': request}).data)
 
 
