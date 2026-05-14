@@ -88,6 +88,13 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
                     'signal': data.get('signal'),
                     'sender_id': self.user.id,
                 })
+            
+            # Redundancy: broadcast to current room group to ensure delivery
+            await self.channel_layer.group_send(self.room_group_name, {
+                'type': 'call_signal',
+                'signal': data.get('signal'),
+                'sender_id': self.user.id,
+            })
             return
 
         content = data.get('content', '').strip()
@@ -261,6 +268,13 @@ class DMChatConsumer(AsyncWebsocketConsumer):
                     'signal': data.get('signal'),
                     'sender_id': self.user.id,
                 })
+            
+            # Redundancy: broadcast to current DM room group to ensure delivery
+            await self.channel_layer.group_send(self.room_group_name, {
+                'type': 'call_signal',
+                'signal': data.get('signal'),
+                'sender_id': self.user.id,
+            })
             return
 
         content = data.get('content', '').strip()
